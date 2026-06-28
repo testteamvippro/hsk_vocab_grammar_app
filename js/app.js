@@ -3,7 +3,7 @@ import { grammarData } from '../data/grammar.js';
 
 // State
 let currentMode = 'vocab';
-let currentLevel = 'hsk1';
+let currentLevel = 'hsk1Old';
 let currentData = [];
 
 // DOM Elements
@@ -48,9 +48,13 @@ levelChips.addEventListener('click', (e) => {
 
 // Load data for current level
 function loadLevel() {
+    const grammarLevel = currentLevel === 'hsk1Old' || currentLevel === 'hsk1New'
+        ? 'hsk1'
+        : currentLevel;
+
     currentData = currentMode === 'vocab'
         ? (vocabData[currentLevel] || [])
-        : (grammarData[currentLevel] || []);
+        : (grammarData[grammarLevel] || []);
     searchInput.value = '';
     searchClear.hidden = true;
     renderTable(currentData);
@@ -158,8 +162,5 @@ searchClear.addEventListener('click', () => {
 
 // Event listeners
 searchInput.addEventListener('input', handleSearch);
-
-// Initialize
-loadLevel();
 
 loadLevel();

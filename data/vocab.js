@@ -2018,3 +2018,10 @@ export const vocabData = {
         { hanzi: "堕落", pinyin: "duòluò", vi: "sa đọa", en: "to degenerate" }
     ]
 };
+
+vocabData.hsk1Old = vocabData.hsk1;
+vocabData.hsk1New = [
+    ...vocabData.hsk1,
+    ...vocabData.hsk2,
+    ...vocabData.hsk3
+].slice(0, 500);
