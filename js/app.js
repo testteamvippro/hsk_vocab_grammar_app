@@ -1,370 +1,277 @@
-import { vocabData }   from '../data/vocab.js';
-import { grammarData } from '../data/grammar.js';
+import { defaultVocabSetKey, vocabSets } from "../data/vocab.js";
 
-// ─── State ───────────────────────────────────────────────
-let currentMode  = 'vocab';
-let currentLevel = 'hsk1';
-let currentView  = 'table'; // 'table' | 'card' | 'flash'
-let currentData  = [];
-let flashIndex   = 0;
-let flashFlipped = false;
+const STORAGE_KEY = "hsk-vocab-mastered";
 
-// ─── DOM ─────────────────────────────────────────────────
-const btnVocab      = document.getElementById('btnVocab');
-const btnGrammar    = document.getElementById('btnGrammar');
-const levelChips    = document.getElementById('levelChips');
-const searchInput   = document.getElementById('searchInput');
-const searchClear   = document.getElementById('searchClear');
-const tableHeader   = document.getElementById('tableHeader');
-const appBody       = document.getElementById('appBody');
-const tableWrapper  = document.getElementById('tableWrapper');
-const cardGrid      = document.getElementById('cardGrid');
-const flashArea     = document.getElementById('flashArea');
-const flipCard      = document.getElementById('flipCard');
-const flipFront     = document.getElementById('flipFront');
-const flipBack      = document.getElementById('flipBack');
-const flashCounter  = document.getElementById('flashCounter');
-const flashProgress = document.getElementById('flashProgressFill');
-const fcPrev        = document.getElementById('fcPrev');
-const fcNext        = document.getElementById('fcNext');
-const fcFlip        = document.getElementById('fcFlip');
-const emptyState    = document.getElementById('emptyState');
-const wordCount     = document.getElementById('wordCount');
-const viewToggle    = document.getElementById('viewToggle');
-const toastContainer= document.getElementById('toastContainer');
+let currentSourceKey = defaultVocabSetKey;
+let currentView = "cards";
+let quizIndex = 0;
+let quizItems = [];
+let masteredState = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+if (Array.isArray(masteredState)) {
+  masteredState = { [defaultVocabSetKey]: masteredState };
+}
 
-// ─── Tabs ─────────────────────────────────────────────────
-btnVocab.addEventListener('click', () => {
-    if (currentMode === 'vocab') return;
-    currentMode = 'vocab';
-    btnVocab.classList.add('active');
-    btnGrammar.classList.remove('active');
-    searchInput.placeholder = 'Tìm kiếm từ vựng...';
-    // Hide flash-only mode for grammar — stay on table/card
-    if (currentView === 'flash') setView('table');
-    loadLevel();
-});
+const els = {
+  sourceTitle: document.getElementById("sourceTitle"),
+  sourceDescription: document.getElementById("sourceDescription"),
+  searchInput: document.getElementById("searchInput"),
+  practiceMode: document.getElementById("practiceMode"),
+  cardsView: document.getElementById("cardsView"),
+  tableView: document.getElementById("tableView"),
+  tableBody: document.getElementById("tableBody"),
+  quizView: document.getElementById("quizView"),
+  emptyState: document.getElementById("emptyState"),
+  visibleCount: document.getElementById("visibleCount"),
+  todayCount: document.getElementById("todayCount"),
+  completionRate: document.getElementById("completionRate"),
+  masteredCount: document.getElementById("masteredCount"),
+  totalCount: document.getElementById("totalCount"),
+  quizIndex: document.getElementById("quizIndex"),
+  quizHanzi: document.getElementById("quizHanzi"),
+  quizPinyin: document.getElementById("quizPinyin"),
+  quizMeaning: document.getElementById("quizMeaning"),
+  answerBox: document.getElementById("answerBox"),
+  answerToggle: document.getElementById("answerToggle"),
+  prevButton: document.getElementById("prevButton"),
+  nextButton: document.getElementById("nextButton"),
+  knownButton: document.getElementById("knownButton"),
+  shuffleButton: document.getElementById("shuffleButton"),
+};
 
-btnGrammar.addEventListener('click', () => {
-    if (currentMode === 'grammar') return;
-    currentMode = 'grammar';
-    btnGrammar.classList.add('active');
-    btnVocab.classList.remove('active');
-    searchInput.placeholder = 'Tìm kiếm ngữ pháp...';
-    if (currentView === 'flash') setView('table');
-    loadLevel();
-});
+function getActiveSet() {
+  return vocabSets[currentSourceKey];
+}
 
-// ─── Level chips ──────────────────────────────────────────
-levelChips.addEventListener('click', (e) => {
-    const chip = e.target.closest('.chip');
-    if (!chip) return;
-    levelChips.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
-    chip.classList.add('active');
-    currentLevel = chip.dataset.level;
-    loadLevel();
-    showToast(`Đã chọn ${chip.textContent}`, 'info');
-});
+function getActiveItems() {
+  return getActiveSet().items;
+}
 
-// ─── View toggle ──────────────────────────────────────────
-viewToggle.addEventListener('click', (e) => {
-    const btn = e.target.closest('.view-btn');
-    if (!btn) return;
-    const view = btn.dataset.view;
-    if (view === currentView) return;
-    // grammar has no flashcard
-    if (view === 'flash' && currentMode === 'grammar') {
-        showToast('Flashcard chỉ hỗ trợ chế độ Từ Vựng', 'info');
-        return;
+function getMastered() {
+  return new Set(masteredState[currentSourceKey] || []);
+}
+
+function normalize(value) {
+  return value.toLocaleLowerCase("vi-VN").normalize("NFC");
+}
+
+function saveProgress() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(masteredState));
+}
+
+function getFilteredItems() {
+  const query = normalize(els.searchInput.value.trim());
+  const mode = els.practiceMode.value;
+  const mastered = getMastered();
+
+  return getActiveItems().filter((item) => {
+    const isMastered = mastered.has(item.id);
+    if (mode === "unknown" && isMastered) return false;
+    if (mode === "mastered" && !isMastered) return false;
+    if (!query) return true;
+
+    return [item.hanzi, item.pinyin, item.vi].some((field) =>
+      normalize(field).includes(query),
+    );
+  });
+}
+
+function updateSummary(items) {
+  const activeItems = getActiveItems();
+  const mastered = getMastered();
+  const learned = mastered.size;
+  const unknown = activeItems.length - learned;
+  els.visibleCount.textContent = items.length;
+  els.todayCount.textContent = unknown;
+  els.masteredCount.textContent = learned;
+  els.totalCount.textContent = activeItems.length;
+  els.completionRate.textContent = `${Math.round((learned / activeItems.length) * 100)}%`;
+}
+
+function makeToggle(item) {
+  const mastered = getMastered();
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = `learn-toggle${mastered.has(item.id) ? " is-on" : ""}`;
+  button.textContent = mastered.has(item.id) ? "Mastered" : "Mark learned";
+  button.addEventListener("click", () => {
+    const nextMastered = getMastered();
+    if (mastered.has(item.id)) {
+      nextMastered.delete(item.id);
+    } else {
+      nextMastered.add(item.id);
     }
-    setView(view);
-    renderCurrentView(currentData);
-});
+    masteredState[currentSourceKey] = [...nextMastered];
+    saveProgress();
+    render();
+  });
+  return button;
+}
+
+function renderCards(items) {
+  els.cardsView.innerHTML = "";
+  const fragment = document.createDocumentFragment();
+
+  items.forEach((item) => {
+    const mastered = getMastered();
+    const card = document.createElement("article");
+    card.className = `word-card${mastered.has(item.id) ? " is-mastered" : ""}`;
+    card.innerHTML = `
+      <span class="card-id">#${item.id}</span>
+      <div class="hanzi">${item.hanzi}</div>
+      <div class="pinyin">${item.pinyin}</div>
+      <p class="meaning">${item.vi}</p>
+    `;
+    card.appendChild(makeToggle(item));
+    fragment.appendChild(card);
+  });
+
+  els.cardsView.appendChild(fragment);
+}
+
+function renderTable(items) {
+  els.tableBody.innerHTML = "";
+  const fragment = document.createDocumentFragment();
+
+  items.forEach((item) => {
+    const row = document.createElement("tr");
+    row.innerHTML = `
+      <td>${item.id}</td>
+      <td>${item.hanzi}</td>
+      <td>${item.pinyin}</td>
+      <td>${item.vi}</td>
+      <td></td>
+    `;
+    row.lastElementChild.appendChild(makeToggle(item));
+    fragment.appendChild(row);
+  });
+
+  els.tableBody.appendChild(fragment);
+}
+
+function renderQuiz(items) {
+  quizItems = items.length ? items : [];
+  if (quizIndex >= quizItems.length) quizIndex = 0;
+  const item = quizItems[quizIndex];
+  if (!item) return;
+  const mastered = getMastered();
+
+  els.answerBox.hidden = true;
+  els.answerToggle.textContent = "Show answer";
+  els.quizIndex.textContent = `${quizIndex + 1} / ${quizItems.length}`;
+  els.quizHanzi.textContent = item.hanzi;
+  els.quizPinyin.textContent = item.pinyin;
+  els.quizMeaning.textContent = item.vi;
+  els.prevButton.disabled = quizIndex === 0;
+  els.nextButton.disabled = quizIndex === quizItems.length - 1;
+  els.knownButton.textContent = mastered.has(item.id) ? "Unmark mastered" : "Mark mastered";
+}
 
 function setView(view) {
-    currentView = view;
-    viewToggle.querySelectorAll('.view-btn').forEach(b => {
-        b.classList.toggle('active', b.dataset.view === view);
-    });
+  currentView = view;
+  document.querySelectorAll(".tab").forEach((tab) => {
+    const active = tab.dataset.view === view;
+    tab.classList.toggle("is-active", active);
+    tab.setAttribute("aria-selected", String(active));
+  });
+  render();
 }
 
-// ─── Load level ───────────────────────────────────────────
-function loadLevel() {
-    currentData = currentMode === 'vocab'
-        ? (vocabData[currentLevel]   || [])
-        : (grammarData[currentLevel] || []);
-    searchInput.value = '';
-    searchClear.hidden = true;
-    flashIndex   = 0;
-    flashFlipped = false;
-    renderCurrentView(currentData);
-    updateWordCount(currentData.length);
+function setSource(sourceKey) {
+  if (!vocabSets[sourceKey] || sourceKey === currentSourceKey) return;
+  currentSourceKey = sourceKey;
+  quizIndex = 0;
+  els.searchInput.value = "";
+  els.practiceMode.value = "all";
+
+  document.querySelectorAll(".source-tab").forEach((tab) => {
+    tab.classList.toggle("is-active", tab.dataset.source === sourceKey);
+  });
+
+  render();
 }
 
-// ─── Word count ───────────────────────────────────────────
-function updateWordCount(count) {
-    const label = currentMode === 'vocab' ? 'từ' : 'mẫu';
-    wordCount.textContent = `${count} ${label}`;
-    // Re-trigger animation
-    wordCount.style.animation = 'none';
-    wordCount.offsetWidth; // reflow
-    wordCount.style.animation = '';
+function render() {
+  const items = getFilteredItems();
+  const activeSet = getActiveSet();
+  els.sourceTitle.textContent = activeSet.label;
+  els.sourceDescription.textContent = `${activeSet.description} Source: ${activeSet.source}.`;
+  updateSummary(items);
+
+  els.cardsView.hidden = currentView !== "cards" || items.length === 0;
+  els.tableView.hidden = currentView !== "table" || items.length === 0;
+  els.quizView.hidden = currentView !== "quiz" || items.length === 0;
+  els.emptyState.hidden = items.length !== 0;
+
+  if (currentView === "cards") renderCards(items);
+  if (currentView === "table") renderTable(items);
+  if (currentView === "quiz") renderQuiz(items);
 }
 
-// ─── Route to correct renderer ───────────────────────────
-function renderCurrentView(data) {
-    if (currentView === 'table') {
-        showSection('table');
-        renderTable(data);
-    } else if (currentView === 'card') {
-        showSection('card');
-        renderCards(data);
-    } else {
-        showSection('flash');
-        renderFlashcard(data, flashIndex);
-    }
-}
-
-function showSection(mode) {
-    tableWrapper.hidden = true;
-    cardGrid.hidden     = true;
-    flashArea.hidden    = true;
-    emptyState.hidden   = true;
-
-    if (mode === 'table') tableWrapper.hidden = false;
-    else if (mode === 'card') cardGrid.hidden = false;
-    else if (mode === 'flash') flashArea.hidden = false;
-    else emptyState.hidden = false;
-}
-
-// ─── TABLE VIEW ───────────────────────────────────────────
-function renderTable(data) {
-    appBody.innerHTML  = '';
-    tableHeader.innerHTML = '';
-
-    if (currentMode === 'vocab') {
-        tableHeader.innerHTML = `<tr>
-            <th>#</th><th>Hán tự</th><th>Pinyin</th><th>Tiếng Việt</th><th>English</th>
-        </tr>`;
-    } else {
-        tableHeader.innerHTML = `<tr>
-            <th>#</th><th>Cấu trúc</th><th>Cách dùng</th><th>Ví dụ</th>
-        </tr>`;
-    }
-
-    if (data.length === 0) {
-        tableWrapper.hidden = true;
-        emptyState.hidden = false;
-        return;
-    }
-
-    const frag = document.createDocumentFragment();
-
-    data.forEach((item, i) => {
-        const tr = document.createElement('tr');
-        if (currentMode === 'vocab') {
-            tr.innerHTML = `
-                <td class="cell-index">${i + 1}</td>
-                <td class="cell-hanzi">${item.hanzi}</td>
-                <td class="cell-pinyin"><span class="pin">${item.pinyin}</span></td>
-                <td class="cell-vi">${item.vi}</td>
-                <td class="cell-en">${item.en}</td>
-            `;
-        } else {
-            tr.innerHTML = `
-                <td class="cell-index">${i + 1}</td>
-                <td class="cell-structure">${item.structure}</td>
-                <td class="cell-usage">${item.usage}</td>
-                <td class="cell-example">
-                    <span class="ex-cn">${item.ex_cn}</span>
-                    <span class="ex-py">${item.ex_py}</span>
-                    <span class="ex-vi">${item.ex_vi}</span>
-                </td>
-            `;
-        }
-        frag.appendChild(tr);
-    });
-
-    appBody.appendChild(frag);
-}
-
-// ─── CARD VIEW ────────────────────────────────────────────
-function renderCards(data) {
-    cardGrid.innerHTML = '';
-
-    if (data.length === 0) {
-        cardGrid.hidden   = true;
-        emptyState.hidden = false;
-        return;
-    }
-
-    const frag = document.createDocumentFragment();
-
-    data.forEach((item, i) => {
-        const card = document.createElement('div');
-
-        if (currentMode === 'vocab') {
-            card.className = 'vocab-card';
-            card.innerHTML = `
-                <span class="card-num">${i + 1}</span>
-                <div class="card-hanzi">${item.hanzi}</div>
-                <div class="card-pinyin">${item.pinyin}</div>
-                <div class="card-vi">${item.vi}</div>
-                <div class="card-en">${item.en}</div>
-            `;
-        } else {
-            card.className = 'grammar-card';
-            card.innerHTML = `
-                <div class="grammar-structure">${item.structure}</div>
-                <div class="grammar-usage">${item.usage}</div>
-                <div class="grammar-example">
-                    <span class="ex-cn">${item.ex_cn}</span>
-                    <span class="ex-py">${item.ex_py}</span>
-                    <span class="ex-vi">${item.ex_vi}</span>
-                </div>
-            `;
-        }
-        frag.appendChild(card);
-    });
-
-    cardGrid.appendChild(frag);
-}
-
-// ─── FLASHCARD VIEW ───────────────────────────────────────
-function renderFlashcard(data, idx) {
-    if (data.length === 0) {
-        flashArea.hidden  = true;
-        emptyState.hidden = false;
-        return;
-    }
-
-    const item  = data[idx];
-    const total = data.length;
-
-    flashCounter.textContent = `${idx + 1} / ${total}`;
-    flashProgress.style.width = `${((idx + 1) / total) * 100}%`;
-
-    // Reset flip
-    flashFlipped = false;
-    flipCard.classList.remove('flipped');
-
-    // Front face — show hanzi only
-    flipFront.innerHTML = `
-        <div class="flip-hanzi">${item.hanzi}</div>
-        <div class="flip-hint">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.55"/></svg>
-            Nhấn để xem nghĩa
-        </div>
-    `;
-
-    // Back face — pinyin + vi + en
-    flipBack.innerHTML = `
-        <div class="flip-back-pinyin">${item.pinyin}</div>
-        <div class="flip-back-vi">${item.vi}</div>
-        <div class="flip-back-en">${item.en}</div>
-    `;
-
-    fcPrev.disabled = idx === 0;
-    fcNext.disabled = idx === total - 1;
-}
-
-// Flip card click / button
-flipCard.addEventListener('click', toggleFlip);
-fcFlip.addEventListener('click', toggleFlip);
-
-function toggleFlip() {
-    flashFlipped = !flashFlipped;
-    flipCard.classList.toggle('flipped', flashFlipped);
-}
-
-fcPrev.addEventListener('click', () => {
-    if (flashIndex > 0) {
-        flashIndex--;
-        renderFlashcard(currentData, flashIndex);
-    }
+document.querySelectorAll(".tab").forEach((tab) => {
+  tab.addEventListener("click", () => setView(tab.dataset.view));
 });
 
-fcNext.addEventListener('click', () => {
-    if (flashIndex < currentData.length - 1) {
-        flashIndex++;
-        renderFlashcard(currentData, flashIndex);
-    } else {
-        showToast('Đã học xong tất cả thẻ! 🎉', 'success');
-    }
+document.querySelectorAll(".source-tab").forEach((tab) => {
+  tab.addEventListener("click", () => setSource(tab.dataset.source));
 });
 
-// Keyboard nav for flashcard
-document.addEventListener('keydown', (e) => {
-    if (currentView !== 'flash') return;
-    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
-        fcNext.click();
-    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
-        fcPrev.click();
-    } else if (e.key === ' ' || e.key === 'Enter') {
-        e.preventDefault();
-        toggleFlip();
-    }
+els.searchInput.addEventListener("input", () => {
+  quizIndex = 0;
+  render();
 });
 
-// ─── Search ───────────────────────────────────────────────
-let searchTimeout;
-
-function handleSearch() {
-    clearTimeout(searchTimeout);
-    searchTimeout = setTimeout(() => {
-        const q = searchInput.value.toLowerCase().trim();
-        searchClear.hidden = !q;
-
-        if (!q) {
-            renderCurrentView(currentData);
-            updateWordCount(currentData.length);
-            return;
-        }
-
-        const filtered = currentData.filter(item => {
-            if (currentMode === 'vocab') {
-                return item.hanzi.includes(q)         ||
-                       item.pinyin.toLowerCase().includes(q) ||
-                       item.vi.toLowerCase().includes(q)     ||
-                       item.en.toLowerCase().includes(q);
-            } else {
-                return item.structure.toLowerCase().includes(q) ||
-                       item.usage.toLowerCase().includes(q)     ||
-                       item.ex_cn.includes(q)                   ||
-                       item.ex_vi.toLowerCase().includes(q);
-            }
-        });
-
-        // Reset flash index on new search
-        flashIndex = 0;
-        renderCurrentView(filtered);
-        updateWordCount(filtered.length);
-    }, 150);
-}
-
-searchInput.addEventListener('input', handleSearch);
-
-searchClear.addEventListener('click', () => {
-    searchInput.value  = '';
-    searchClear.hidden = true;
-    flashIndex         = 0;
-    renderCurrentView(currentData);
-    updateWordCount(currentData.length);
-    searchInput.focus();
+els.practiceMode.addEventListener("change", () => {
+  quizIndex = 0;
+  render();
 });
 
-// ─── Toast ────────────────────────────────────────────────
-function showToast(message, type = 'info') {
-    const toast = document.createElement('div');
-    toast.className = `toast ${type}`;
-    toast.textContent = message;
-    toastContainer.appendChild(toast);
+els.answerToggle.addEventListener("click", () => {
+  els.answerBox.hidden = !els.answerBox.hidden;
+  els.answerToggle.textContent = els.answerBox.hidden ? "Show answer" : "Hide answer";
+});
 
-    setTimeout(() => {
-        toast.classList.add('hiding');
-        toast.addEventListener('animationend', () => toast.remove(), { once: true });
-    }, 2400);
-}
+els.prevButton.addEventListener("click", () => {
+  if (quizIndex > 0) {
+    quizIndex -= 1;
+    renderQuiz(quizItems);
+  }
+});
 
-// ─── Init ─────────────────────────────────────────────────
-loadLevel();
+els.nextButton.addEventListener("click", () => {
+  if (quizIndex < quizItems.length - 1) {
+    quizIndex += 1;
+    renderQuiz(quizItems);
+  }
+});
+
+els.knownButton.addEventListener("click", () => {
+  const item = quizItems[quizIndex];
+  if (!item) return;
+  const nextMastered = getMastered();
+  if (nextMastered.has(item.id)) {
+    nextMastered.delete(item.id);
+  } else {
+    nextMastered.add(item.id);
+  }
+  masteredState[currentSourceKey] = [...nextMastered];
+  saveProgress();
+  render();
+});
+
+els.shuffleButton.addEventListener("click", () => {
+  quizItems = [...getFilteredItems()].sort(() => Math.random() - 0.5);
+  quizIndex = 0;
+  renderQuiz(quizItems);
+});
+
+document.addEventListener("keydown", (event) => {
+  if (currentView !== "quiz") return;
+  if (event.key === "ArrowRight") els.nextButton.click();
+  if (event.key === "ArrowLeft") els.prevButton.click();
+  if (event.key === " " || event.key === "Enter") {
+    event.preventDefault();
+    els.answerToggle.click();
+  }
+});
+
+render();
