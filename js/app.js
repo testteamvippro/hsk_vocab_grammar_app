@@ -48,9 +48,7 @@ levelChips.addEventListener('click', (e) => {
 
 // Load data for current level
 function loadLevel() {
-    const grammarLevel = currentLevel === 'hsk1Old' || currentLevel === 'hsk1New'
-        ? 'hsk1'
-        : currentLevel;
+    const grammarLevel = currentLevel.replace(/(Old|New)$/, '');
 
     currentData = currentMode === 'vocab'
         ? (vocabData[currentLevel] || [])
