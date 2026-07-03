@@ -66,7 +66,6 @@ const els = {
     reviewVocab: document.getElementById('reviewVocab'),
     reviewGrammar: document.getElementById('reviewGrammar'),
     examPanel: document.getElementById('examPanel'),
-    examSetup: document.getElementById('examSetup'),
     examTitle: document.getElementById('examTitle'),
     examIntro: document.getElementById('examIntro'),
     startExam: document.getElementById('startExam'),
@@ -116,6 +115,27 @@ const tableConfig = {
         unit: 'mẫu',
         label: 'ngữ pháp',
         title: 'Flashcard ngữ pháp',
+    },
+};
+
+const routeConfig = {
+    study: {
+        nav: 'navStudy',
+        showCoursePanel: true,
+    },
+    review: {
+        nav: 'navReview',
+        panel: 'reviewPanel',
+    },
+    exam: {
+        nav: 'navExam',
+        panel: 'examPanel',
+        forceVocab: true,
+    },
+    tests: {
+        nav: 'navTests',
+        panel: 'testPanel',
+        forceVocab: true,
     },
 };
 
@@ -280,99 +300,83 @@ function switchStandard(standard) {
 }
 
 function setView(view) {
-    if (currentRoute !== 'study') showStudyRoute(false);
+    if (currentRoute !== 'study') showStudyRoute();
     currentView = view;
     els.cardViewBtn.classList.toggle('active', view === 'cards');
     els.tableViewBtn.classList.toggle('active', view === 'table');
     els.deckPanel.hidden = view !== 'cards';
     els.tableWrapper.hidden = view !== 'table' || currentFiltered.length === 0;
-    els.reviewPanel.hidden = true;
-    els.examPanel.hidden = true;
-    els.testPanel.hidden = true;
+    hideRoutePanels();
     els.surfaceTitle.textContent = view === 'cards' ? tableConfig[currentMode].title : 'Danh sách tra cứu';
     renderEmptyState();
 }
 
 function showStudyRoute(updateNav = true) {
-    currentRoute = 'study';
-    if (updateNav) {
-        els.navStudy.classList.add('active');
-        els.navDecks.classList.remove('active');
-        els.navReview.classList.remove('active');
-        els.navExam.classList.remove('active');
-        els.navTests.classList.remove('active');
-    }
-    els.coursePanel.hidden = false;
-    els.standardPanel.hidden = currentMode !== 'vocab';
-    els.reviewPanel.hidden = true;
-    els.examPanel.hidden = true;
-    els.testPanel.hidden = true;
-    els.emptyState.hidden = true;
+    activateRoute('study', { updateNav });
     setView(currentView);
     updateMeta(els.searchInput.value.toLowerCase().trim());
 }
 
 function showReviewRoute() {
-    currentRoute = 'review';
-    els.navStudy.classList.remove('active');
-    els.navDecks.classList.remove('active');
-    els.navReview.classList.add('active');
-    els.navExam.classList.remove('active');
-    els.navTests.classList.remove('active');
-    els.coursePanel.hidden = true;
-    els.deckPanel.hidden = true;
-    els.tableWrapper.hidden = true;
-    els.emptyState.hidden = true;
-    els.reviewPanel.hidden = false;
-    els.examPanel.hidden = true;
-    els.testPanel.hidden = true;
+    activateRoute('review');
     renderReviewPage();
 }
 
 function showExamRoute() {
-    currentRoute = 'exam';
-    currentMode = 'vocab';
-    currentLevel = getBestLevelForMode('vocab', currentLevel);
-    els.btnVocab.classList.add('active');
-    els.btnGrammar.classList.remove('active');
-    renderLevelChips();
-    els.navStudy.classList.remove('active');
-    els.navDecks.classList.remove('active');
-    els.navReview.classList.remove('active');
-    els.navExam.classList.add('active');
-    els.navTests.classList.remove('active');
-    els.coursePanel.hidden = false;
-    els.standardPanel.hidden = false;
-    els.deckPanel.hidden = true;
-    els.tableWrapper.hidden = true;
-    els.emptyState.hidden = true;
-    els.reviewPanel.hidden = true;
-    els.examPanel.hidden = false;
-    els.testPanel.hidden = true;
+    activateRoute('exam');
     renderExamSetup();
 }
 
 function showTestRoute() {
-    currentRoute = 'tests';
+    activateRoute('tests');
+    renderTestPage();
+}
+
+function activateRoute(route, options = {}) {
+    const config = routeConfig[route];
+    currentRoute = route;
+
+    if (config.forceVocab) {
+        forceVocabMode();
+    }
+
+    if (options.updateNav !== false) {
+        setActiveNav(config.nav);
+    }
+
+    hideRoutePanels();
+    els.coursePanel.hidden = !config.showCoursePanel && !config.forceVocab;
+    els.standardPanel.hidden = currentMode !== 'vocab';
+    els.deckPanel.hidden = route !== 'study';
+    els.tableWrapper.hidden = true;
+    els.emptyState.hidden = true;
+
+    if (config.panel) {
+        els[config.panel].hidden = false;
+    }
+}
+
+function forceVocabMode() {
     currentMode = 'vocab';
     currentLevel = getBestLevelForMode('vocab', currentLevel);
     els.btnVocab.classList.add('active');
     els.btnGrammar.classList.remove('active');
+    els.searchInput.placeholder = tableConfig.vocab.placeholder;
     renderLevelChips();
-    els.navStudy.classList.remove('active');
-    els.navDecks.classList.remove('active');
-    els.navReview.classList.remove('active');
-    els.navExam.classList.remove('active');
-    els.navTests.classList.add('active');
-    els.coursePanel.hidden = false;
-    els.standardPanel.hidden = false;
-    els.deckPanel.hidden = true;
-    els.tableWrapper.hidden = true;
-    els.emptyState.hidden = true;
+}
+
+function setActiveNav(activeKey) {
+    Object.values(routeConfig).forEach((config) => {
+        if (!config.nav) return;
+        els[config.nav].classList.toggle('active', config.nav === activeKey);
+    });
+    els.navDecks.classList.toggle('active', activeKey === 'navDecks');
+}
+
+function hideRoutePanels() {
     els.reviewPanel.hidden = true;
     els.examPanel.hidden = true;
-    els.testPanel.hidden = false;
-    renderTestPage();
+    els.testPanel.hidden = true;
 }
 
 function getBestLevelForMode(mode, preferredLevel) {
@@ -389,10 +393,6 @@ function getData(mode, level) {
     return mode === 'vocab'
         ? (vocabData[level] || vocabData[getBaseLevelKey(level)] || [])
         : (grammarData[level] || []);
-}
-
-function getTotal(mode) {
-    return getLevelKeys(mode).reduce((sum, level) => sum + getData(mode, level).length, 0);
 }
 
 function getLevelKeys(mode) {
@@ -488,7 +488,6 @@ function updateMeta(query) {
     const visible = currentFiltered.length;
     const learned = countLearned(currentMode, currentLevel, currentData);
     const progress = total ? Math.max(learned > 0 ? 8 : 0, Math.round((learned / total) * 100)) : 0;
-    const newBucket = Math.max(0, total - learned);
 
     els.wordCount.textContent = `${visible} ${config.unit}`;
     els.activeLevelLabel.textContent = levelName;
@@ -966,13 +965,21 @@ function renderTestPage() {
 
 function buildTestCard(test, isActive) {
     const pageLabel = test.pages ? `${test.pages} trang` : 'PDF';
+    const activeLabel = isActive ? '<span class="test-active-label">Đang chọn</span>' : '';
     return `
         <article class="test-card${isActive ? ' active' : ''}">
             <div class="test-card-main">
-                <span class="review-tag">${escapeHtml(formatLevel(test.level))}</span>
+                <div class="test-card-topline">
+                    <span class="review-tag">${escapeHtml(formatLevel(test.level))}</span>
+                    ${activeLabel}
+                </div>
                 <h4>${escapeHtml(test.title)}</h4>
                 <p>${escapeHtml(test.note)}</p>
-                <span>${escapeHtml(pageLabel)} • MP3 listening</span>
+                <div class="test-meta">
+                    <span>${escapeHtml(pageLabel)}</span>
+                    <span>Listening MP3</span>
+                    <span>PDF paper</span>
+                </div>
             </div>
             <div class="test-player">
                 <audio controls preload="none" src="${escapeHtml(test.audio)}"></audio>

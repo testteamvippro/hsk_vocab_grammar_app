@@ -409,7 +409,21 @@ button:disabled {
 }
 
 .summary-card {
+    position: relative;
+    overflow: hidden;
     padding: 16px;
+}
+
+.summary-card::after {
+    content: "";
+    position: absolute;
+    right: 12px;
+    bottom: 12px;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: var(--blue-soft);
+    opacity: 0.65;
 }
 
 .summary-card span,
@@ -420,6 +434,8 @@ button:disabled {
 }
 
 .summary-card strong {
+    position: relative;
+    z-index: 1;
     display: block;
     margin-top: 4px;
     color: var(--ink);
@@ -916,6 +932,15 @@ tbody tr:hover {
     border-radius: var(--radius);
     background: #fff;
     padding: 16px;
+    transition: border-color var(--transition), box-shadow var(--transition), transform var(--transition);
+}
+
+.review-item:hover,
+.test-card:hover,
+.exam-setup:hover {
+    border-color: #cbe2ff;
+    box-shadow: 0 12px 24px rgba(15, 23, 42, 0.06);
+    transform: translateY(-1px);
 }
 
 .review-item-main {
@@ -1101,12 +1126,43 @@ tbody tr:hover {
     background: #f8fbff;
 }
 
-.test-card-main span:last-child {
-    display: block;
-    margin-top: 6px;
-    color: var(--blue-dark);
-    font-size: 0.86rem;
+.test-card-topline {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
+.test-active-label {
+    display: inline-flex;
+    min-height: 24px;
+    align-items: center;
+    border-radius: 999px;
+    background: #eafaf2;
+    color: #08784d;
+    font-size: 0.72rem;
     font-weight: 800;
+    padding: 3px 9px;
+}
+
+.test-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 10px;
+}
+
+.test-meta span {
+    display: inline-flex;
+    min-height: 26px;
+    align-items: center;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: #fff;
+    color: var(--blue-dark);
+    font-size: 0.78rem;
+    font-weight: 800;
+    padding: 3px 9px;
 }
 
 .test-player {
@@ -1116,6 +1172,7 @@ tbody tr:hover {
 
 .test-player audio {
     width: 100%;
+    min-height: 38px;
 }
 
 .test-actions {
@@ -1211,8 +1268,12 @@ tbody tr:hover {
     }
 
     .side-nav {
-        grid-auto-flow: column;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
         margin-left: auto;
+    }
+
+    .side-link {
+        justify-content: center;
     }
 
     .sidebar-card {
@@ -1334,10 +1395,17 @@ tbody tr:hover {
 
     .exam-actions,
     .exam-footer,
-    .test-toolbar,
-    .test-actions {
+    .test-toolbar {
         align-items: stretch;
         flex-direction: column;
+    }
+
+    .test-actions {
+        justify-content: stretch;
+    }
+
+    .test-actions a {
+        flex: 1;
     }
 }
 
@@ -1355,7 +1423,9 @@ tbody tr:hover {
 
     .side-link {
         justify-content: center;
-        padding: 9px 8px;
+        min-height: 40px;
+        padding: 8px 6px;
+        font-size: 0.78rem;
     }
 
     .side-link span {
