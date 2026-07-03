@@ -7,7 +7,7 @@
     <meta name="description" content="Ứng dụng học từ vựng và ngữ pháp HSK bằng flashcard, pinyin và nghĩa tiếng Việt">
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%E4%B9%A6%3C/text%3E%3C/svg%3E">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="./css/style.css?v=20260703-953ece1">
+    <link rel="stylesheet" href="./css/style.css?v=20260703-full-tests">
 </head>
 <body>
     <div class="app-shell">
@@ -32,6 +32,14 @@
                 <button class="side-link" id="navReview" type="button">
                     <span aria-hidden="true">✓</span>
                     Ôn tập
+                </button>
+                <button class="side-link" id="navExam" type="button">
+                    <span aria-hidden="true">◎</span>
+                    Thi thử
+                </button>
+                <button class="side-link" id="navTests" type="button">
+                    <span aria-hidden="true">▣</span>
+                    Đề thi
                 </button>
             </nav>
 
@@ -90,20 +98,20 @@
 
             <section class="summary-row" aria-label="Tổng quan học tập">
                 <div class="summary-card">
-                    <span>Từ vựng</span>
-                    <strong id="totalVocab">0</strong>
+                    <span>Hôm nay</span>
+                    <strong id="dailyGoal">0/20</strong>
                 </div>
                 <div class="summary-card">
-                    <span>Mẫu câu</span>
-                    <strong id="totalGrammar">0</strong>
+                    <span>Chuỗi ngày</span>
+                    <strong id="streakCount">0</strong>
                 </div>
                 <div class="summary-card">
-                    <span>Mới</span>
-                    <strong id="bucketNew">0</strong>
+                    <span>XP</span>
+                    <strong id="xpCount">0</strong>
                 </div>
                 <div class="summary-card">
-                    <span>Cần ôn</span>
-                    <strong id="bucketRepeat">0</strong>
+                    <span>Đến hạn ôn</span>
+                    <strong id="dueCount">0</strong>
                 </div>
             </section>
 
@@ -176,10 +184,38 @@
                     <div class="review-panel" id="reviewPanel" hidden>
                         <div class="review-toolbar" aria-label="Lọc nội dung ôn tập">
                             <button class="review-filter active" id="reviewAll" type="button" data-filter="all">Tất cả</button>
+                            <button class="review-filter" id="reviewDue" type="button" data-filter="due">Đến hạn</button>
                             <button class="review-filter" id="reviewVocab" type="button" data-filter="vocab">Từ vựng</button>
                             <button class="review-filter" id="reviewGrammar" type="button" data-filter="grammar">Ngữ pháp</button>
                         </div>
                         <div class="review-list" id="reviewList"></div>
+                    </div>
+
+                    <div class="exam-panel" id="examPanel" hidden>
+                        <div class="exam-setup" id="examSetup">
+                            <div class="exam-copy">
+                                <span class="review-tag">Thi thử theo cấp HSK</span>
+                                <h4 id="examTitle">HSK 1 Practice Exam</h4>
+                                <p id="examIntro">Bài thi nhanh gồm từ vựng và ngữ pháp trong cấp đang chọn.</p>
+                            </div>
+                            <div class="exam-actions">
+                                <button class="primary-action exam-start" id="startExam" type="button">Bắt đầu thi thử</button>
+                                <button class="ghost-light-action" id="examStudyLevel" type="button">Ôn cấp này</button>
+                            </div>
+                        </div>
+                        <div class="exam-body" id="examBody"></div>
+                    </div>
+
+                    <div class="test-panel" id="testPanel" hidden>
+                        <div class="test-toolbar">
+                            <div>
+                                <span class="review-tag">PDF + audio</span>
+                                <h4>Thư viện đề thi HSK</h4>
+                                <p>Chọn đúng cấp, nghe audio và mở file PDF để làm bài như đề thật.</p>
+                            </div>
+                            <button class="ghost-light-action" id="testStudyLevel" type="button">Ôn cấp đang chọn</button>
+                        </div>
+                        <div class="test-list" id="testList"></div>
                     </div>
 
                     <div class="content-area">
@@ -200,6 +236,6 @@
         </main>
     </div>
 
-    <script type="module" src="./js/app.js?v=20260703-953ece1"></script>
+    <script type="module" src="./js/app.js?v=20260703-full-tests"></script>
 </body>
 </html>

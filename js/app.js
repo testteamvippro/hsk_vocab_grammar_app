@@ -1,5 +1,6 @@
 import { vocabData } from '../data/vocab.js';
 import { grammarData } from '../data/grammar.js';
+import { testData } from '../data/tests.js';
 
 const standards = {
     new: {
@@ -15,6 +16,9 @@ const standards = {
 };
 
 const progressStorageKey = 'hskMasteryProgress.v1';
+const statsStorageKey = 'hskMasteryStats.v1';
+const dailyGoalTarget = 20;
+const reviewIntervals = [1, 3, 7, 14, 30];
 
 let currentMode = 'vocab';
 let currentStandard = 'new';
@@ -27,11 +31,15 @@ let isCardFlipped = false;
 let currentRoute = 'study';
 let currentReviewFilter = 'all';
 let progressState = loadProgressState();
+let statsState = loadStatsState();
+let currentExam = null;
 
 const els = {
     navStudy: document.getElementById('navStudy'),
     navDecks: document.getElementById('navDecks'),
     navReview: document.getElementById('navReview'),
+    navExam: document.getElementById('navExam'),
+    navTests: document.getElementById('navTests'),
     coursePanel: document.getElementById('coursePanel'),
     btnVocab: document.getElementById('btnVocab'),
     btnGrammar: document.getElementById('btnGrammar'),
@@ -54,13 +62,24 @@ const els = {
     reviewPanel: document.getElementById('reviewPanel'),
     reviewList: document.getElementById('reviewList'),
     reviewAll: document.getElementById('reviewAll'),
+    reviewDue: document.getElementById('reviewDue'),
     reviewVocab: document.getElementById('reviewVocab'),
     reviewGrammar: document.getElementById('reviewGrammar'),
+    examPanel: document.getElementById('examPanel'),
+    examSetup: document.getElementById('examSetup'),
+    examTitle: document.getElementById('examTitle'),
+    examIntro: document.getElementById('examIntro'),
+    startExam: document.getElementById('startExam'),
+    examStudyLevel: document.getElementById('examStudyLevel'),
+    examBody: document.getElementById('examBody'),
+    testPanel: document.getElementById('testPanel'),
+    testList: document.getElementById('testList'),
+    testStudyLevel: document.getElementById('testStudyLevel'),
     wordCount: document.getElementById('wordCount'),
-    totalVocab: document.getElementById('totalVocab'),
-    totalGrammar: document.getElementById('totalGrammar'),
-    bucketNew: document.getElementById('bucketNew'),
-    bucketRepeat: document.getElementById('bucketRepeat'),
+    dailyGoal: document.getElementById('dailyGoal'),
+    streakCount: document.getElementById('streakCount'),
+    xpCount: document.getElementById('xpCount'),
+    dueCount: document.getElementById('dueCount'),
     resultMeta: document.getElementById('resultMeta'),
     activeLevelLabel: document.getElementById('activeLevelLabel'),
     courseTitle: document.getElementById('courseTitle'),
@@ -108,6 +127,8 @@ els.navDecks.addEventListener('click', () => {
     setView('table');
 });
 els.navReview.addEventListener('click', () => showReviewRoute());
+els.navExam.addEventListener('click', () => showExamRoute());
+els.navTests.addEventListener('click', () => showTestRoute());
 els.btnVocab.addEventListener('click', () => switchMode('vocab'));
 els.btnGrammar.addEventListener('click', () => switchMode('grammar'));
 els.btnHskNew.addEventListener('click', () => switchStandard('new'));
@@ -156,8 +177,10 @@ els.reviewPanel.addEventListener('click', (event) => {
     }
 
     const unlearnButton = event.target.closest('[data-review-action="unlearn"]');
-    if (!unlearnButton) return;
-    setProgressValue(unlearnButton.dataset.key, { learned: false });
+    const reviewedButton = event.target.closest('[data-review-action="reviewed"]');
+    if (!unlearnButton && !reviewedButton) return;
+    if (unlearnButton) setProgressValue(unlearnButton.dataset.key, { learned: false });
+    if (reviewedButton) setProgressValue(reviewedButton.dataset.key, { reviewed: true });
     renderReviewPage();
     renderTable(currentFiltered);
     syncCardProgressControls();
@@ -170,10 +193,40 @@ els.reviewPanel.addEventListener('input', (event) => {
     setProgressValue(target.dataset.key, { note: target.value });
 });
 
+els.startExam.addEventListener('click', startExam);
+els.examStudyLevel.addEventListener('click', () => showStudyRoute());
+els.testStudyLevel.addEventListener('click', () => showStudyRoute());
+els.examBody.addEventListener('click', (event) => {
+    const option = event.target.closest('[data-exam-option]');
+    if (option) {
+        answerExamQuestion(Number(option.dataset.examOption));
+        return;
+    }
+
+    if (event.target.closest('[data-exam-action="next"]')) {
+        moveExam(1);
+        return;
+    }
+
+    if (event.target.closest('[data-exam-action="restart"]')) {
+        startExam();
+    }
+});
+
 els.levelChips.addEventListener('click', (event) => {
     const chip = event.target.closest('.level-chip');
     if (!chip) return;
     currentLevel = chip.dataset.level;
+    if (currentRoute === 'exam') {
+        renderLevelChips();
+        renderExamSetup();
+        return;
+    }
+    if (currentRoute === 'tests') {
+        renderLevelChips();
+        renderTestPage();
+        return;
+    }
     loadLevel();
 });
 
@@ -206,11 +259,23 @@ function switchMode(mode) {
 function switchStandard(standard) {
     if (currentStandard === standard) return;
 
-    showStudyRoute(false);
+    const wasExam = currentRoute === 'exam';
+    const wasTests = currentRoute === 'tests';
+    if (!wasExam && !wasTests) showStudyRoute(false);
     currentStandard = standard;
     currentLevel = getFirstPopulatedLevel(currentMode);
     els.btnHskNew.classList.toggle('active', standard === 'new');
     els.btnHskOld.classList.toggle('active', standard === 'old');
+    if (wasExam) {
+        renderLevelChips();
+        renderExamSetup();
+        return;
+    }
+    if (wasTests) {
+        renderLevelChips();
+        renderTestPage();
+        return;
+    }
     loadLevel();
 }
 
@@ -222,6 +287,8 @@ function setView(view) {
     els.deckPanel.hidden = view !== 'cards';
     els.tableWrapper.hidden = view !== 'table' || currentFiltered.length === 0;
     els.reviewPanel.hidden = true;
+    els.examPanel.hidden = true;
+    els.testPanel.hidden = true;
     els.surfaceTitle.textContent = view === 'cards' ? tableConfig[currentMode].title : 'Danh sách tra cứu';
     renderEmptyState();
 }
@@ -232,10 +299,14 @@ function showStudyRoute(updateNav = true) {
         els.navStudy.classList.add('active');
         els.navDecks.classList.remove('active');
         els.navReview.classList.remove('active');
+        els.navExam.classList.remove('active');
+        els.navTests.classList.remove('active');
     }
     els.coursePanel.hidden = false;
     els.standardPanel.hidden = currentMode !== 'vocab';
     els.reviewPanel.hidden = true;
+    els.examPanel.hidden = true;
+    els.testPanel.hidden = true;
     els.emptyState.hidden = true;
     setView(currentView);
     updateMeta(els.searchInput.value.toLowerCase().trim());
@@ -246,12 +317,62 @@ function showReviewRoute() {
     els.navStudy.classList.remove('active');
     els.navDecks.classList.remove('active');
     els.navReview.classList.add('active');
+    els.navExam.classList.remove('active');
+    els.navTests.classList.remove('active');
     els.coursePanel.hidden = true;
     els.deckPanel.hidden = true;
     els.tableWrapper.hidden = true;
     els.emptyState.hidden = true;
     els.reviewPanel.hidden = false;
+    els.examPanel.hidden = true;
+    els.testPanel.hidden = true;
     renderReviewPage();
+}
+
+function showExamRoute() {
+    currentRoute = 'exam';
+    currentMode = 'vocab';
+    currentLevel = getBestLevelForMode('vocab', currentLevel);
+    els.btnVocab.classList.add('active');
+    els.btnGrammar.classList.remove('active');
+    renderLevelChips();
+    els.navStudy.classList.remove('active');
+    els.navDecks.classList.remove('active');
+    els.navReview.classList.remove('active');
+    els.navExam.classList.add('active');
+    els.navTests.classList.remove('active');
+    els.coursePanel.hidden = false;
+    els.standardPanel.hidden = false;
+    els.deckPanel.hidden = true;
+    els.tableWrapper.hidden = true;
+    els.emptyState.hidden = true;
+    els.reviewPanel.hidden = true;
+    els.examPanel.hidden = false;
+    els.testPanel.hidden = true;
+    renderExamSetup();
+}
+
+function showTestRoute() {
+    currentRoute = 'tests';
+    currentMode = 'vocab';
+    currentLevel = getBestLevelForMode('vocab', currentLevel);
+    els.btnVocab.classList.add('active');
+    els.btnGrammar.classList.remove('active');
+    renderLevelChips();
+    els.navStudy.classList.remove('active');
+    els.navDecks.classList.remove('active');
+    els.navReview.classList.remove('active');
+    els.navExam.classList.remove('active');
+    els.navTests.classList.add('active');
+    els.coursePanel.hidden = false;
+    els.standardPanel.hidden = false;
+    els.deckPanel.hidden = true;
+    els.tableWrapper.hidden = true;
+    els.emptyState.hidden = true;
+    els.reviewPanel.hidden = true;
+    els.examPanel.hidden = true;
+    els.testPanel.hidden = false;
+    renderTestPage();
 }
 
 function getBestLevelForMode(mode, preferredLevel) {
@@ -373,9 +494,8 @@ function updateMeta(query) {
     els.activeLevelLabel.textContent = levelName;
     els.courseTitle.textContent = `${levelName} ${currentMode === 'vocab' ? `Vocabulary - ${standardName}` : 'Grammar'}`;
     els.levelHint.textContent = `${total} ${config.label} trong bộ hiện tại. Chọn thẻ, lật nghĩa, rồi chuyển sang mục kế tiếp.`;
-    els.bucketNew.textContent = newBucket;
-    els.bucketRepeat.textContent = learned;
     els.progressFill.style.width = `${progress}%`;
+    renderMotivationStats();
 
     if (query) {
         els.resultMeta.textContent = `Tìm thấy ${visible}/${total} ${config.unit} cho "${query}".`;
@@ -498,9 +618,12 @@ function buildProgressCells(key, progress) {
 
 function renderReviewPage() {
     const learnedItems = getLearnedItems()
-        .filter((entry) => currentReviewFilter === 'all' || entry.mode === currentReviewFilter);
+        .filter((entry) => currentReviewFilter === 'all'
+            || entry.mode === currentReviewFilter
+            || (currentReviewFilter === 'due' && isDue(entry.progress)));
 
     els.reviewAll.classList.toggle('active', currentReviewFilter === 'all');
+    els.reviewDue.classList.toggle('active', currentReviewFilter === 'due');
     els.reviewVocab.classList.toggle('active', currentReviewFilter === 'vocab');
     els.reviewGrammar.classList.toggle('active', currentReviewFilter === 'grammar');
     els.surfaceTitle.textContent = 'Ôn tập đã học';
@@ -510,7 +633,7 @@ function renderReviewPage() {
     els.levelHint.textContent = 'Tất cả mục bạn đã đánh dấu "Đã học" sẽ xuất hiện ở đây để xem lại nhanh.';
     els.progressFill.style.width = learnedItems.length ? '100%' : '0%';
     els.resultMeta.textContent = learnedItems.length
-        ? `Có ${learnedItems.length} mục đã học trong danh sách ôn tập.`
+        ? `Có ${learnedItems.length} mục trong danh sách ôn tập.`
         : 'Chưa có mục nào được đánh dấu đã học.';
 
     if (learnedItems.length === 0) {
@@ -562,13 +685,14 @@ function buildReviewControls(key, note) {
     return `
         <div class="review-controls">
             <textarea class="note-input" rows="3" data-review-action="note" data-key="${escapeHtml(key)}" placeholder="Ghi chú ôn tập...">${escapeHtml(note)}</textarea>
+            <button class="reviewed-action" type="button" data-review-action="reviewed" data-key="${escapeHtml(key)}">Đã ôn xong</button>
             <button class="unlearn-action" type="button" data-review-action="unlearn" data-key="${escapeHtml(key)}">Bỏ đã học</button>
         </div>
     `;
 }
 
 function renderEmptyState() {
-    if (currentRoute === 'review') {
+    if (currentRoute === 'review' || currentRoute === 'exam' || currentRoute === 'tests') {
         els.emptyState.hidden = true;
         return;
     }
@@ -664,21 +788,38 @@ function getProgress(key) {
         learned: Boolean(progressState[key]?.learned),
         note: progressState[key]?.note || '',
         updatedAt: progressState[key]?.updatedAt || '',
+        learnedAt: progressState[key]?.learnedAt || '',
+        reviewStage: Number(progressState[key]?.reviewStage || 0),
+        dueAt: progressState[key]?.dueAt || '',
     };
 }
 
 function setProgressValue(key, patch) {
+    const previous = getProgress(key);
+    const isNewLearned = patch.learned === true && !previous.learned;
+    const isReviewCompletion = patch.reviewed === true;
+    const nextStage = isReviewCompletion ? Math.min(previous.reviewStage + 1, reviewIntervals.length - 1) : previous.reviewStage;
+
     progressState[key] = {
-        ...getProgress(key),
+        ...previous,
         ...patch,
+        ...(isNewLearned ? { learnedAt: new Date().toISOString(), reviewStage: 0 } : {}),
+        ...(isNewLearned || isReviewCompletion ? { dueAt: getFutureDate(reviewIntervals[isReviewCompletion ? nextStage : 0]) } : {}),
+        ...(isReviewCompletion ? { learned: true, reviewStage: nextStage } : {}),
         updatedAt: new Date().toISOString(),
     };
+
+    delete progressState[key].reviewed;
+
+    if (isNewLearned) recordStudyActivity(5);
+    if (isReviewCompletion) recordStudyActivity(3);
 
     if (!progressState[key].learned && !progressState[key].note) {
         delete progressState[key];
     }
 
     saveProgressState();
+    renderMotivationStats();
 }
 
 function loadProgressState() {
@@ -695,6 +836,290 @@ function loadProgressState() {
 function saveProgressState() {
     if (typeof localStorage === 'undefined') return;
     localStorage.setItem(progressStorageKey, JSON.stringify(progressState));
+}
+
+function loadStatsState() {
+    if (typeof localStorage === 'undefined') return { xp: 0, days: {} };
+
+    try {
+        const parsed = JSON.parse(localStorage.getItem(statsStorageKey) || '{}');
+        return {
+            xp: Number(parsed.xp || 0),
+            days: parsed.days && typeof parsed.days === 'object' ? parsed.days : {},
+            exams: parsed.exams && typeof parsed.exams === 'object' ? parsed.exams : {},
+        };
+    } catch {
+        return { xp: 0, days: {}, exams: {} };
+    }
+}
+
+function saveStatsState() {
+    if (typeof localStorage === 'undefined') return;
+    localStorage.setItem(statsStorageKey, JSON.stringify(statsState));
+}
+
+function recordStudyActivity(xp) {
+    const today = getTodayKey();
+    const current = statsState.days[today] || { learned: 0, reviews: 0 };
+    statsState.days[today] = {
+        ...current,
+        learned: current.learned + 1,
+    };
+    statsState.xp += xp;
+    saveStatsState();
+}
+
+function recordExamResult(score, total) {
+    const key = `${currentStandard}:${currentLevel}`;
+    statsState.exams[key] = {
+        score,
+        total,
+        percent: total ? Math.round((score / total) * 100) : 0,
+        finishedAt: new Date().toISOString(),
+    };
+    statsState.xp += score * 2;
+    saveStatsState();
+    renderMotivationStats();
+}
+
+function renderMotivationStats() {
+    const today = statsState.days[getTodayKey()] || { learned: 0 };
+    const learnedToday = Math.min(today.learned || 0, dailyGoalTarget);
+    els.dailyGoal.textContent = `${learnedToday}/${dailyGoalTarget}`;
+    els.streakCount.textContent = countStreak();
+    els.xpCount.textContent = statsState.xp || 0;
+    els.dueCount.textContent = getLearnedItems().filter((entry) => isDue(entry.progress)).length;
+}
+
+function countStreak() {
+    let streak = 0;
+    const date = new Date();
+
+    while (true) {
+        const key = formatDateKey(date);
+        if (!statsState.days[key]?.learned) break;
+        streak += 1;
+        date.setDate(date.getDate() - 1);
+    }
+
+    return streak;
+}
+
+function getTodayKey() {
+    return formatDateKey(new Date());
+}
+
+function formatDateKey(date) {
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function getFutureDate(days) {
+    const date = new Date();
+    date.setDate(date.getDate() + days);
+    return date.toISOString();
+}
+
+function isDue(progress) {
+    return progress.learned && (!progress.dueAt || new Date(progress.dueAt) <= new Date());
+}
+
+function renderExamSetup() {
+    const levelName = formatLevel(currentLevel);
+    const vocabCount = getData('vocab', currentLevel).length;
+    const grammarLevel = getBaseLevelKey(currentLevel);
+    const grammarCount = getData('grammar', grammarLevel).length;
+    const lastExam = statsState.exams[`${currentStandard}:${currentLevel}`];
+
+    currentExam = null;
+    els.examBody.innerHTML = '';
+    els.examTitle.textContent = `${levelName} Practice Exam`;
+    els.examIntro.textContent = `${vocabCount} từ vựng và ${grammarCount} mẫu ngữ pháp có thể được dùng để tạo bài thi nhanh.`;
+    els.surfaceTitle.textContent = 'Thi thử HSK';
+    els.activeLevelLabel.textContent = levelName;
+    els.courseTitle.textContent = `Thi thử ${levelName} - ${standards[currentStandard].label}`;
+    els.levelHint.textContent = lastExam
+        ? `Lần gần nhất: ${lastExam.score}/${lastExam.total} điểm (${lastExam.percent}%).`
+        : 'Chọn cấp HSK bên trái, rồi bắt đầu bài thi thử.';
+    els.resultMeta.textContent = 'Bài thi gồm câu hỏi chọn nghĩa, chọn pinyin và nhận diện ngữ pháp.';
+    els.wordCount.textContent = 'Exam';
+    els.progressFill.style.width = lastExam ? `${lastExam.percent}%` : '0%';
+    renderMotivationStats();
+}
+
+function renderTestPage() {
+    const activeLevelNumber = getLevelNumber(currentLevel);
+    const activeTest = testData.find((test) => getLevelNumber(test.level) === activeLevelNumber);
+
+    els.surfaceTitle.textContent = 'Đề thi đầy đủ';
+    els.activeLevelLabel.textContent = formatLevel(currentLevel);
+    els.courseTitle.textContent = `Bộ đề ${formatLevel(currentLevel)} - ${standards[currentStandard].label}`;
+    els.levelHint.textContent = activeTest
+        ? `${activeTest.title}: mở PDF, bật audio, rồi tự chấm theo file đề.`
+        : `Chưa có file đề thi cho ${formatLevel(currentLevel)}.`;
+    els.resultMeta.textContent = `${testData.length} bộ đề PDF + audio đã được tìm thấy trong thư mục data.`;
+    els.wordCount.textContent = `${testData.length} đề`;
+    els.progressFill.style.width = activeTest ? '100%' : '0%';
+
+    els.testList.innerHTML = testData.map((test) => buildTestCard(test, getLevelNumber(test.level) === activeLevelNumber)).join('');
+    renderMotivationStats();
+}
+
+function buildTestCard(test, isActive) {
+    const pageLabel = test.pages ? `${test.pages} trang` : 'PDF';
+    return `
+        <article class="test-card${isActive ? ' active' : ''}">
+            <div class="test-card-main">
+                <span class="review-tag">${escapeHtml(formatLevel(test.level))}</span>
+                <h4>${escapeHtml(test.title)}</h4>
+                <p>${escapeHtml(test.note)}</p>
+                <span>${escapeHtml(pageLabel)} • MP3 listening</span>
+            </div>
+            <div class="test-player">
+                <audio controls preload="none" src="${escapeHtml(test.audio)}"></audio>
+                <div class="test-actions">
+                    <a class="primary-action" href="${escapeHtml(test.pdf)}" target="_blank" rel="noopener">Mở PDF</a>
+                    <a class="ghost-light-action" href="${escapeHtml(test.audio)}" target="_blank" rel="noopener">Mở audio</a>
+                </div>
+            </div>
+        </article>
+    `;
+}
+
+function startExam() {
+    const questions = buildExamQuestions(currentLevel);
+    currentExam = {
+        questions,
+        index: 0,
+        answers: Array(questions.length).fill(null),
+    };
+    renderExamQuestion();
+}
+
+function buildExamQuestions(level) {
+    const vocabItems = shuffle(getData('vocab', level)).slice(0, 10);
+    const grammarItems = shuffle(getData('grammar', getBaseLevelKey(level))).slice(0, 5);
+    const allVocab = getData('vocab', level);
+
+    const vocabQuestions = vocabItems.flatMap((item) => {
+        const meaningOptions = buildOptions(getMeaning(item), allVocab.map(getMeaning));
+        const pinyinOptions = buildOptions(item.pinyin, allVocab.map((entry) => entry.pinyin));
+        return [
+            {
+                prompt: `Nghĩa của "${item.hanzi}" là gì?`,
+                helper: item.pinyin,
+                options: meaningOptions,
+                answer: meaningOptions.indexOf(getMeaning(item)),
+            },
+            {
+                prompt: `Pinyin đúng của "${item.hanzi}" là gì?`,
+                helper: getMeaning(item),
+                options: pinyinOptions,
+                answer: pinyinOptions.indexOf(item.pinyin),
+            },
+        ];
+    });
+
+    const grammarQuestions = grammarItems.map((item) => {
+        const options = buildOptions(item.structure, grammarItems.concat(getData('grammar', getBaseLevelKey(level))).map((entry) => entry.structure));
+        return {
+            prompt: `Cấu trúc nào phù hợp với ví dụ: ${item.ex_cn || item.usage}`,
+            helper: getGrammarExampleDetail(item),
+            options,
+            answer: options.indexOf(item.structure),
+        };
+    });
+
+    return shuffle(vocabQuestions.concat(grammarQuestions)).slice(0, 20);
+}
+
+function buildOptions(correct, candidates) {
+    const pool = [...new Set(candidates.filter(Boolean).filter((value) => value !== correct))];
+    return shuffle([correct, ...shuffle(pool).slice(0, 3)]);
+}
+
+function renderExamQuestion() {
+    if (!currentExam || currentExam.questions.length === 0) {
+        els.examBody.innerHTML = `
+            <div class="review-empty">
+                <strong>Chưa đủ dữ liệu để tạo đề</strong>
+                <span>Hãy chọn cấp HSK có từ vựng hoặc ngữ pháp.</span>
+            </div>
+        `;
+        return;
+    }
+
+    const question = currentExam.questions[currentExam.index];
+    const selected = currentExam.answers[currentExam.index];
+    const answered = selected !== null;
+
+    els.examBody.innerHTML = `
+        <article class="exam-question">
+            <div class="exam-progress-line">
+                <span>Câu ${currentExam.index + 1}/${currentExam.questions.length}</span>
+                <strong>${getExamScore()}/${currentExam.questions.length}</strong>
+            </div>
+            <h4>${escapeHtml(question.prompt)}</h4>
+            <p>${escapeHtml(question.helper)}</p>
+            <div class="exam-options">
+                ${question.options.map((option, index) => `
+                    <button class="exam-option${answered && index === question.answer ? ' is-correct' : ''}${answered && index === selected && index !== question.answer ? ' is-wrong' : ''}" type="button" data-exam-option="${index}" ${answered ? 'disabled' : ''}>
+                        ${escapeHtml(option)}
+                    </button>
+                `).join('')}
+            </div>
+            <div class="exam-footer">
+                <span>${answered ? (selected === question.answer ? '+10 XP cảm giác rất đã.' : `Đáp án đúng: ${escapeHtml(question.options[question.answer])}`) : 'Chọn một đáp án để tiếp tục.'}</span>
+                <button class="primary-action" type="button" data-exam-action="next" ${answered ? '' : 'disabled'}>${currentExam.index === currentExam.questions.length - 1 ? 'Xem kết quả' : 'Câu tiếp'}</button>
+            </div>
+        </article>
+    `;
+}
+
+function answerExamQuestion(optionIndex) {
+    if (!currentExam) return;
+    currentExam.answers[currentExam.index] = optionIndex;
+    renderExamQuestion();
+}
+
+function moveExam() {
+    if (!currentExam) return;
+
+    if (currentExam.index < currentExam.questions.length - 1) {
+        currentExam.index += 1;
+        renderExamQuestion();
+        return;
+    }
+
+    renderExamResult();
+}
+
+function renderExamResult() {
+    const score = getExamScore();
+    const total = currentExam.questions.length;
+    const percent = total ? Math.round((score / total) * 100) : 0;
+    recordExamResult(score, total);
+
+    els.examBody.innerHTML = `
+        <div class="exam-result">
+            <span class="review-tag">Kết quả</span>
+            <strong>${score}/${total}</strong>
+            <p>${percent >= 80 ? 'Rất ổn. Cấp này đang vào guồng.' : percent >= 60 ? 'Khá tốt. Ôn lại các mục sai là lên nhanh.' : 'Chưa sao. Dùng kết quả này để biết mình cần ôn phần nào.'}</p>
+            <button class="primary-action" type="button" data-exam-action="restart">Làm lại đề khác</button>
+        </div>
+    `;
+    els.progressFill.style.width = `${percent}%`;
+    els.levelHint.textContent = `Điểm vừa rồi: ${score}/${total} (${percent}%).`;
+}
+
+function getExamScore() {
+    if (!currentExam) return 0;
+    return currentExam.answers.reduce((sum, answer, index) => {
+        return sum + (answer === currentExam.questions[index].answer ? 1 : 0);
+    }, 0);
+}
+
+function shuffle(items) {
+    return [...items].sort(() => Math.random() - 0.5);
 }
 
 function buildHeader(columns) {
@@ -727,9 +1152,8 @@ function formatLevel(level) {
 }
 
 function init() {
-    els.totalVocab.textContent = getTotal('vocab');
-    els.totalGrammar.textContent = getTotal('grammar');
     els.searchInput.placeholder = tableConfig[currentMode].placeholder;
+    renderMotivationStats();
     loadLevel();
 }
 
