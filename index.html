@@ -7,7 +7,7 @@
     <meta name="description" content="Ứng dụng học từ vựng và ngữ pháp HSK bằng flashcard, pinyin và nghĩa tiếng Việt">
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%E4%B9%A6%3C/text%3E%3C/svg%3E">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="./css/style.css?v=20260704-all-tests">
+    <link rel="stylesheet" href="./css/style.css?v=20260704-ai-tutor">
 </head>
 <body>
     <div class="app-shell">
@@ -40,6 +40,10 @@
                 <button class="side-link" id="navTests" type="button">
                     <span aria-hidden="true">▣</span>
                     Đề thi
+                </button>
+                <button class="side-link" id="navAi" type="button">
+                    <span aria-hidden="true">✦</span>
+                    AI Tutor
                 </button>
             </nav>
 
@@ -218,6 +222,26 @@
                         <div class="test-list" id="testList"></div>
                     </div>
 
+                    <div class="ai-panel" id="aiPanel" hidden>
+                        <div class="ai-toolbar">
+                            <div>
+                                <span class="review-tag">AI Tutor</span>
+                                <h4>Trò chuyện để luyện HSK</h4>
+                                <p>Hỏi nghĩa từ, cách dùng ngữ pháp, hoặc yêu cầu tạo bài luyện nhanh từ dữ liệu đang học.</p>
+                            </div>
+                        </div>
+                        <div class="ai-chat" id="aiMessages" aria-live="polite"></div>
+                        <div class="ai-quick-prompts" id="aiQuickPrompts">
+                            <button type="button" data-ai-prompt="Give me a 5 minute study plan for this HSK level">Kế hoạch 5 phút</button>
+                            <button type="button" data-ai-prompt="Quiz me with 3 vocabulary questions">Quiz từ vựng</button>
+                            <button type="button" data-ai-prompt="Explain one grammar point from this level">Giải thích ngữ pháp</button>
+                        </div>
+                        <form class="ai-form" id="aiForm">
+                            <input id="aiInput" type="text" placeholder="Ví dụ: giải thích 把, quiz HSK 3, nghĩa của 学习..." autocomplete="off">
+                            <button class="primary-action" type="submit">Gửi</button>
+                        </form>
+                    </div>
+
                     <div class="content-area">
                         <div class="table-wrapper" id="tableWrapper" hidden>
                             <table>
@@ -236,6 +260,6 @@
         </main>
     </div>
 
-    <script type="module" src="./js/app.js?v=20260704-all-tests"></script>
+    <script type="module" src="./js/app.js?v=20260704-ai-tutor"></script>
 </body>
 </html>

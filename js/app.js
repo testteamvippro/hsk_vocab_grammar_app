@@ -34,6 +34,7 @@ let showAllTests = false;
 let progressState = loadProgressState();
 let statsState = loadStatsState();
 let currentExam = null;
+let aiMessages = [];
 
 const els = {
     navStudy: document.getElementById('navStudy'),
@@ -41,6 +42,7 @@ const els = {
     navReview: document.getElementById('navReview'),
     navExam: document.getElementById('navExam'),
     navTests: document.getElementById('navTests'),
+    navAi: document.getElementById('navAi'),
     coursePanel: document.getElementById('coursePanel'),
     btnVocab: document.getElementById('btnVocab'),
     btnGrammar: document.getElementById('btnGrammar'),
@@ -75,6 +77,11 @@ const els = {
     testPanel: document.getElementById('testPanel'),
     testList: document.getElementById('testList'),
     testStudyLevel: document.getElementById('testStudyLevel'),
+    aiPanel: document.getElementById('aiPanel'),
+    aiMessages: document.getElementById('aiMessages'),
+    aiQuickPrompts: document.getElementById('aiQuickPrompts'),
+    aiForm: document.getElementById('aiForm'),
+    aiInput: document.getElementById('aiInput'),
     wordCount: document.getElementById('wordCount'),
     dailyGoal: document.getElementById('dailyGoal'),
     streakCount: document.getElementById('streakCount'),
@@ -104,14 +111,14 @@ const els = {
 
 const tableConfig = {
     vocab: {
-        columns: ['#', 'Hán tự', 'Pinyin', 'Tiếng Việt', 'English', 'Đã học', 'Ghi chú'],
+        columns: ['#', 'Hán tự', 'Pinyin', 'Tiếng Việt', 'English', 'Đã học'],
         placeholder: 'Tìm Hán tự, pinyin, nghĩa Việt hoặc English...',
         unit: 'từ',
         label: 'từ vựng',
         title: 'Flashcard từ vựng',
     },
     grammar: {
-        columns: ['#', 'Cấu trúc', 'Cách dùng', 'Ví dụ', 'Đã học', 'Ghi chú'],
+        columns: ['#', 'Cấu trúc', 'Cách dùng', 'Ví dụ', 'Đã học'],
         placeholder: 'Tìm cấu trúc, cách dùng hoặc ví dụ...',
         unit: 'mẫu',
         label: 'ngữ pháp',
@@ -138,6 +145,11 @@ const routeConfig = {
         panel: 'testPanel',
         forceVocab: true,
     },
+    ai: {
+        nav: 'navAi',
+        panel: 'aiPanel',
+        forceVocab: true,
+    },
 };
 
 els.navStudy.addEventListener('click', () => showStudyRoute());
@@ -150,6 +162,7 @@ els.navDecks.addEventListener('click', () => {
 els.navReview.addEventListener('click', () => showReviewRoute());
 els.navExam.addEventListener('click', () => showExamRoute());
 els.navTests.addEventListener('click', () => showTestRoute());
+els.navAi.addEventListener('click', () => showAiRoute());
 els.btnVocab.addEventListener('click', () => switchMode('vocab'));
 els.btnGrammar.addEventListener('click', () => switchMode('grammar'));
 els.btnHskNew.addEventListener('click', () => switchStandard('new'));
@@ -180,13 +193,6 @@ els.appBody.addEventListener('change', (event) => {
     setProgressValue(target.dataset.key, { learned: target.checked });
     syncCardProgressControls();
     updateMeta(els.searchInput.value.toLowerCase().trim());
-});
-
-els.appBody.addEventListener('input', (event) => {
-    const target = event.target.closest('[data-progress-action="note"]');
-    if (!target) return;
-    setProgressValue(target.dataset.key, { note: target.value });
-    syncCardProgressControls();
 });
 
 els.reviewPanel.addEventListener('click', (event) => {
@@ -250,6 +256,17 @@ els.testPanel.addEventListener('click', (event) => {
     renderTestPage();
 });
 
+els.aiQuickPrompts.addEventListener('click', (event) => {
+    const promptButton = event.target.closest('[data-ai-prompt]');
+    if (!promptButton) return;
+    submitAiMessage(promptButton.dataset.aiPrompt);
+});
+
+els.aiForm.addEventListener('submit', (event) => {
+    event.preventDefault();
+    submitAiMessage(els.aiInput.value);
+});
+
 els.levelChips.addEventListener('click', (event) => {
     const chip = event.target.closest('.level-chip');
     if (!chip) return;
@@ -262,6 +279,11 @@ els.levelChips.addEventListener('click', (event) => {
     if (currentRoute === 'tests') {
         renderLevelChips();
         renderTestPage();
+        return;
+    }
+    if (currentRoute === 'ai') {
+        renderLevelChips();
+        renderAiPanel(false);
         return;
     }
     loadLevel();
@@ -298,7 +320,8 @@ function switchStandard(standard) {
 
     const wasExam = currentRoute === 'exam';
     const wasTests = currentRoute === 'tests';
-    if (!wasExam && !wasTests) showStudyRoute(false);
+    const wasAi = currentRoute === 'ai';
+    if (!wasExam && !wasTests && !wasAi) showStudyRoute(false);
     currentStandard = standard;
     currentLevel = getFirstPopulatedLevel(currentMode);
     els.btnHskNew.classList.toggle('active', standard === 'new');
@@ -311,6 +334,11 @@ function switchStandard(standard) {
     if (wasTests) {
         renderLevelChips();
         renderTestPage();
+        return;
+    }
+    if (wasAi) {
+        renderLevelChips();
+        renderAiPanel(false);
         return;
     }
     loadLevel();
@@ -347,6 +375,11 @@ function showExamRoute() {
 function showTestRoute() {
     activateRoute('tests');
     renderTestPage();
+}
+
+function showAiRoute() {
+    activateRoute('ai');
+    renderAiPanel();
 }
 
 function activateRoute(route, options = {}) {
@@ -394,6 +427,7 @@ function hideRoutePanels() {
     els.reviewPanel.hidden = true;
     els.examPanel.hidden = true;
     els.testPanel.hidden = true;
+    els.aiPanel.hidden = true;
 }
 
 function getBestLevelForMode(mode, preferredLevel) {
@@ -626,9 +660,6 @@ function buildProgressCells(key, progress) {
                 <span>Đã học</span>
             </label>
         </td>
-        <td class="cell-note" data-label="Ghi chú">
-            <textarea class="note-input" rows="2" data-progress-action="note" data-key="${escapeHtml(key)}" placeholder="Ghi chú...">${escapeHtml(progress.note)}</textarea>
-        </td>
     `;
 }
 
@@ -708,7 +739,7 @@ function buildReviewControls(key, note) {
 }
 
 function renderEmptyState() {
-    if (currentRoute === 'review' || currentRoute === 'exam' || currentRoute === 'tests') {
+    if (currentRoute === 'review' || currentRoute === 'exam' || currentRoute === 'tests' || currentRoute === 'ai') {
         els.emptyState.hidden = true;
         return;
     }
@@ -1237,6 +1268,142 @@ function getExamScore() {
     return currentExam.answers.reduce((sum, answer, index) => {
         return sum + (answer === currentExam.questions[index].answer ? 1 : 0);
     }, 0);
+}
+
+function renderAiPanel(keepConversation = true) {
+    const levelName = formatLevel(currentLevel);
+    const vocabItems = getData('vocab', currentLevel);
+    const grammarItems = getData('grammar', getBaseLevelKey(currentLevel));
+
+    els.surfaceTitle.textContent = 'AI Tutor';
+    els.wordCount.textContent = `${vocabItems.length + grammarItems.length} mục`;
+    els.activeLevelLabel.textContent = levelName;
+    els.courseTitle.textContent = `${levelName} AI Tutor`;
+    els.levelHint.textContent = `Hỏi tutor về ${vocabItems.length} từ vựng và ${grammarItems.length} mẫu ngữ pháp trong cấp đang chọn.`;
+    els.resultMeta.textContent = 'Tutor đang dùng dữ liệu nội bộ của app để trả lời, tạo quiz và gợi ý luyện tập.';
+    els.progressFill.style.width = vocabItems.length || grammarItems.length ? '100%' : '0%';
+    renderMotivationStats();
+
+    if (!keepConversation) aiMessages = [];
+    if (aiMessages.length === 0) {
+        aiMessages.push({
+            role: 'assistant',
+            text: `Chào bạn. Mình đang theo ngữ cảnh ${levelName}. Bạn có thể hỏi nghĩa một từ, yêu cầu giải thích ngữ pháp, hoặc bảo mình quiz nhanh.`,
+        });
+    }
+
+    renderAiMessages();
+}
+
+function renderAiMessages() {
+    els.aiMessages.innerHTML = aiMessages.map((message) => `
+        <article class="ai-message ${message.role}">
+            <span>${message.role === 'user' ? 'Bạn' : 'AI Tutor'}</span>
+            <p>${escapeHtml(message.text)}</p>
+        </article>
+    `).join('');
+    els.aiMessages.scrollTop = els.aiMessages.scrollHeight;
+}
+
+function submitAiMessage(rawPrompt) {
+    const prompt = String(rawPrompt || '').trim();
+    if (!prompt) return;
+
+    aiMessages.push({ role: 'user', text: prompt });
+    aiMessages.push({ role: 'assistant', text: generateAiReply(prompt) });
+    els.aiInput.value = '';
+    renderAiMessages();
+}
+
+function generateAiReply(prompt) {
+    const normalized = prompt.toLowerCase();
+    const context = getAiStudyContext();
+    const vocabMatch = findVocabMatch(prompt);
+    const grammarMatch = findGrammarMatch(prompt);
+
+    if (vocabMatch) {
+        return `${vocabMatch.hanzi} (${vocabMatch.pinyin}) nghĩa là "${getMeaning(vocabMatch)}". English: ${getEnglish(vocabMatch)}. Gợi ý luyện: tự đặt 1 câu ngắn với từ này, rồi đánh dấu đã học nếu bạn nhớ được sau khi che nghĩa.`;
+    }
+
+    if (grammarMatch) {
+        return `${grammarMatch.structure}: ${grammarMatch.usage}. Ví dụ: ${grammarMatch.ex_cn || ''}${grammarMatch.ex_py ? ` (${grammarMatch.ex_py})` : ''}. Nghĩa: ${grammarMatch.ex_vi || grammarMatch.source || 'hãy đọc lại ví dụ trong bảng ngữ pháp.'}`;
+    }
+
+    if (normalized.includes('quiz') || normalized.includes('kiểm tra') || normalized.includes('test')) {
+        return buildAiQuizReply(context);
+    }
+
+    if (normalized.includes('grammar') || normalized.includes('ngữ pháp') || normalized.includes('cấu trúc')) {
+        return buildAiGrammarReply(context.grammarItems);
+    }
+
+    if (normalized.includes('vocab') || normalized.includes('từ vựng') || normalized.includes('từ ')) {
+        return buildAiVocabReply(context.vocabItems);
+    }
+
+    if (normalized.includes('plan') || normalized.includes('kế hoạch') || normalized.includes('học')) {
+        return buildAiPlanReply(context);
+    }
+
+    return `Mình có thể giúp theo 4 cách: tra nghĩa từ, giải thích ngữ pháp, tạo quiz nhanh, hoặc lập kế hoạch ôn ${formatLevel(currentLevel)}. Bạn thử hỏi: "quiz 3 câu", "giải thích một mẫu ngữ pháp", hoặc nhập trực tiếp một từ tiếng Trung.`;
+}
+
+function getAiStudyContext() {
+    return {
+        vocabItems: getData('vocab', currentLevel),
+        grammarItems: getData('grammar', getBaseLevelKey(currentLevel)),
+    };
+}
+
+function findVocabMatch(prompt) {
+    const normalized = prompt.toLowerCase();
+    const allLevelKeys = getReviewLevelKeys('vocab');
+    const currentItems = getData('vocab', currentLevel);
+    const allItems = [
+        ...currentItems,
+        ...allLevelKeys.flatMap((level) => level === currentLevel ? [] : getData('vocab', level)),
+    ];
+
+    return allItems.find((item) => item.hanzi && prompt.includes(item.hanzi))
+        || allItems.find((item) => item.pinyin && normalized.includes(item.pinyin.toLowerCase()))
+        || allItems.find((item) => getMeaning(item).toLowerCase().split(/[;,/()]/).some((part) => part.trim() && normalized.includes(part.trim())));
+}
+
+function findGrammarMatch(prompt) {
+    const normalized = prompt.toLowerCase();
+    return getReviewLevelKeys('grammar')
+        .flatMap((level) => getData('grammar', level))
+        .find((item) => prompt.includes(item.structure)
+            || item.structure.toLowerCase().includes(normalized)
+            || normalized.includes(item.usage.toLowerCase()));
+}
+
+function buildAiQuizReply(context) {
+    const vocabQuestions = shuffle(context.vocabItems).slice(0, 3).map((item, index) => {
+        return `${index + 1}. ${item.hanzi} (${item.pinyin}) nghĩa là gì?`;
+    });
+
+    if (vocabQuestions.length > 0) {
+        return `Quiz nhanh ${formatLevel(currentLevel)}:\n${vocabQuestions.join('\n')}\nTrả lời trong đầu trước, rồi kiểm tra ở bảng/flashcard.`;
+    }
+
+    return 'Cấp này chưa có đủ từ vựng để tạo quiz. Hãy chọn HSK khác hoặc chuyển sang phần ngữ pháp.';
+}
+
+function buildAiGrammarReply(grammarItems) {
+    const item = shuffle(grammarItems)[0];
+    if (!item) return 'Cấp này chưa có dữ liệu ngữ pháp. Bạn có thể chọn HSK 1-6 ở phần ngữ pháp để học mẫu câu.';
+    return `${item.structure}: ${item.usage}. Ví dụ: ${item.ex_cn || ''}${item.ex_py ? ` (${item.ex_py})` : ''}. Khi học, hãy đổi chủ ngữ/tân ngữ trong ví dụ để tạo 2 câu mới.`;
+}
+
+function buildAiVocabReply(vocabItems) {
+    const items = shuffle(vocabItems).slice(0, 5);
+    if (items.length === 0) return 'Cấp này chưa có từ vựng. Hãy đổi cấp HSK hoặc phiên bản HSK.';
+    return `5 từ nên ôn ngay:\n${items.map((item) => `- ${item.hanzi} (${item.pinyin}): ${getMeaning(item)}`).join('\n')}`;
+}
+
+function buildAiPlanReply(context) {
+    return `Kế hoạch 5 phút cho ${formatLevel(currentLevel)}:\n1. Học 8 flashcard mới.\n2. Đánh dấu "Đã học" cho từ/mẫu bạn nhớ được.\n3. Làm quiz nhanh 3 câu với tutor.\n4. Vào Ôn tập để xem lại mục đến hạn.\nHiện cấp này có ${context.vocabItems.length} từ vựng và ${context.grammarItems.length} mẫu ngữ pháp.`;
 }
 
 function shuffle(items) {
