@@ -30,6 +30,7 @@ let currentCardIndex = 0;
 let isCardFlipped = false;
 let currentRoute = 'study';
 let currentReviewFilter = 'all';
+let showAllTests = false;
 let progressState = loadProgressState();
 let statsState = loadStatsState();
 let currentExam = null;
@@ -234,8 +235,16 @@ els.examBody.addEventListener('click', (event) => {
 });
 
 els.testPanel.addEventListener('click', (event) => {
+    const allButton = event.target.closest('[data-test-all]');
+    if (allButton) {
+        showAllTests = true;
+        renderTestPage();
+        return;
+    }
+
     const levelButton = event.target.closest('[data-test-level]');
     if (!levelButton) return;
+    showAllTests = false;
     currentLevel = getLevelKeyForNumber(Number(levelButton.dataset.testLevel));
     renderLevelChips();
     renderTestPage();
@@ -957,33 +966,30 @@ function renderTestPage() {
     const activeLevelNumber = getLevelNumber(currentLevel);
     const activeTests = getTestsForCurrentLevel();
     const activeTest = activeTests[0];
+    const visibleTests = showAllTests ? testData : activeTests;
 
     els.surfaceTitle.textContent = 'Đề thi đầy đủ';
-    els.activeLevelLabel.textContent = formatLevel(currentLevel);
-    els.courseTitle.textContent = `Bộ đề ${formatLevel(currentLevel)} - ${standards[currentStandard].label}`;
-    els.levelHint.textContent = activeTest
+    els.activeLevelLabel.textContent = showAllTests ? 'All HSK' : formatLevel(currentLevel);
+    els.courseTitle.textContent = showAllTests
+        ? `Toàn bộ thư viện đề thi HSK`
+        : `Bộ đề ${formatLevel(currentLevel)} - ${standards[currentStandard].label}`;
+    els.levelHint.textContent = showAllTests
+        ? `${testData.length} đề cho HSK 1-6. Chọn một cấp để luyện tập trung.`
+        : activeTest
         ? `${activeTests.length} đề cho ${formatLevel(currentLevel)}. Mở PDF, bật audio, rồi tự chấm theo file đề.`
         : `Chưa có file đề thi cho ${formatLevel(currentLevel)}.`;
-    els.resultMeta.textContent = activeTests.length
+    els.resultMeta.textContent = showAllTests
+        ? `Đang hiển thị toàn bộ ${testData.length} đề thi trong thư viện.`
+        : activeTests.length
         ? `${activeTests.length} đề đang sẵn sàng cho ${formatLevel(currentLevel)}. Tổng cộng có ${testData.length} đề trong thư viện.`
         : `${testData.length} bộ đề đã được tìm thấy trong thư mục data.`;
-    els.wordCount.textContent = `${activeTests.length || testData.length} đề`;
-    els.progressFill.style.width = activeTest ? '100%' : '0%';
+    els.wordCount.textContent = `${visibleTests.length || testData.length} đề`;
+    els.progressFill.style.width = showAllTests || activeTest ? '100%' : '0%';
 
-    els.testList.innerHTML = activeTests.length
+    els.testList.innerHTML = visibleTests.length
         ? `
             ${buildTestLevelTabs(activeLevelNumber)}
-            <div class="test-set-header">
-                <div>
-                    <span class="review-tag">${escapeHtml(formatLevel(currentLevel))}</span>
-                    <h4>${activeTests.length} đề thi đầy đủ</h4>
-                    <p>Mỗi đề gồm file PDF${activeTests.some((test) => test.audio) ? ' và audio nghe' : ''}. Làm lần lượt từ Test 01 đến Test 05 để mô phỏng luyện đề thật.</p>
-                </div>
-                <strong>${activeTests.length}/5</strong>
-            </div>
-            <div class="test-grid">
-                ${activeTests.map((test) => buildTestCard(test)).join('')}
-            </div>
+            ${showAllTests ? buildAllTestsView() : buildLevelTestView(activeTests)}
         `
         : buildNoTestsState();
     renderMotivationStats();
@@ -992,11 +998,15 @@ function renderTestPage() {
 function buildTestLevelTabs(activeLevelNumber) {
     return `
         <div class="test-level-tabs" aria-label="Chọn cấp đề thi">
+            <button class="test-level-tab${showAllTests ? ' active' : ''}" type="button" data-test-all="true">
+                Tất cả
+                <span>${testData.length} đề</span>
+            </button>
             ${Array.from({ length: 6 }, (_, index) => {
                 const levelNumber = index + 1;
                 const count = testData.filter((test) => getLevelNumber(test.level) === levelNumber).length;
                 return `
-                    <button class="test-level-tab${levelNumber === activeLevelNumber ? ' active' : ''}" type="button" data-test-level="${levelNumber}">
+                    <button class="test-level-tab${!showAllTests && levelNumber === activeLevelNumber ? ' active' : ''}" type="button" data-test-level="${levelNumber}">
                         HSK ${levelNumber}
                         <span>${count} đề</span>
                     </button>
@@ -1004,6 +1014,40 @@ function buildTestLevelTabs(activeLevelNumber) {
             }).join('')}
         </div>
     `;
+}
+
+function buildLevelTestView(activeTests) {
+    return `
+        <div class="test-set-header">
+            <div>
+                <span class="review-tag">${escapeHtml(formatLevel(currentLevel))}</span>
+                <h4>${activeTests.length} đề thi đầy đủ</h4>
+                <p>Mỗi đề gồm file PDF${activeTests.some((test) => test.audio) ? ' và audio nghe' : ''}. Làm lần lượt từ Test 01 đến Test 05 để mô phỏng luyện đề thật.</p>
+            </div>
+            <strong>${activeTests.length}/5</strong>
+        </div>
+        <div class="test-grid">
+            ${activeTests.map((test) => buildTestCard(test)).join('')}
+        </div>
+    `;
+}
+
+function buildAllTestsView() {
+    return Array.from({ length: 6 }, (_, index) => {
+        const level = `hsk${index + 1}`;
+        const tests = testData.filter((test) => test.level === level);
+        return `
+            <section class="test-level-section">
+                <div class="test-level-section-header">
+                    <h4>${escapeHtml(formatLevel(level))}</h4>
+                    <span>${tests.length} đề</span>
+                </div>
+                <div class="test-grid">
+                    ${tests.map((test) => buildTestCard(test)).join('')}
+                </div>
+            </section>
+        `;
+    }).join('');
 }
 
 function getTestsForCurrentLevel() {

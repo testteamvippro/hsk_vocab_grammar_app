@@ -1116,7 +1116,7 @@ tbody tr:hover {
 
 .test-level-tabs {
     display: grid;
-    grid-template-columns: repeat(6, minmax(0, 1fr));
+    grid-template-columns: repeat(7, minmax(0, 1fr));
     gap: 8px;
 }
 
@@ -1178,6 +1178,31 @@ tbody tr:hover {
 .test-grid {
     display: grid;
     gap: 10px;
+}
+
+.test-level-section {
+    display: grid;
+    gap: 10px;
+}
+
+.test-level-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    border-bottom: 1px solid var(--line-soft);
+    padding: 4px 0 8px;
+}
+
+.test-level-section-header h4 {
+    color: var(--ink);
+    font-size: 1.05rem;
+}
+
+.test-level-section-header span {
+    color: var(--blue-dark);
+    font-size: 0.84rem;
+    font-weight: 800;
 }
 
 .test-card {
@@ -1398,7 +1423,7 @@ tbody tr:hover {
     }
 
     .test-level-tabs {
-        grid-template-columns: repeat(3, minmax(0, 1fr));
+        grid-template-columns: repeat(4, minmax(0, 1fr));
     }
 
     .deck-actions {
