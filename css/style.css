@@ -549,6 +549,10 @@ button:disabled {
     font-size: 1.25rem;
 }
 
+body:not([data-route="study"]) .view-toggle {
+    display: none;
+}
+
 .view-toggle {
     display: inline-grid;
     grid-template-columns: 1fr 1fr;
@@ -1034,6 +1038,7 @@ tbody tr:hover {
 }
 
 .test-panel,
+.writing-panel,
 .ai-panel {
     border-top: 1px solid var(--line-soft);
     padding: 18px 20px 22px;
@@ -1058,6 +1063,7 @@ tbody tr:hover {
 
 .exam-copy h4,
 .exam-question h4,
+.writing-toolbar h4,
 .test-toolbar h4,
 .test-card h4 {
     margin-top: 10px;
@@ -1068,6 +1074,7 @@ tbody tr:hover {
 .exam-copy p,
 .exam-question p,
 .exam-result p,
+.writing-toolbar p,
 .test-toolbar p,
 .test-card p {
     margin-top: 6px;
@@ -1099,12 +1106,267 @@ tbody tr:hover {
 }
 
 .test-toolbar,
+.writing-toolbar,
 .ai-toolbar {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 16px;
     margin-bottom: 14px;
+}
+
+.writing-content {
+    display: grid;
+    gap: 14px;
+}
+
+.writing-section {
+    display: grid;
+    gap: 12px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: #fff;
+    padding: 16px;
+}
+
+.writing-section-title {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.writing-section-title h4 {
+    color: var(--ink);
+    font-size: 1.2rem;
+}
+
+.stroke-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.stroke-card,
+.rule-card,
+.tone-card,
+.character-practice-card {
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: #f8fbff;
+    padding: 14px;
+}
+
+.stroke-card {
+    display: grid;
+    grid-template-columns: 64px minmax(0, 1fr);
+    gap: 12px;
+    align-items: center;
+}
+
+.stroke-card strong,
+.character-practice-card strong {
+    color: var(--ink);
+    font-family: 'Noto Sans SC', sans-serif;
+    line-height: 1;
+}
+
+.stroke-card strong {
+    font-size: 3rem;
+}
+
+.stroke-card h5,
+.rule-card h5,
+.sound-board h5,
+.radical-group h5 {
+    color: var(--ink);
+    font-size: 0.95rem;
+}
+
+.stroke-card span,
+.tone-card span,
+.character-practice-card span {
+    display: inline-flex;
+    margin-top: 4px;
+    color: var(--blue-dark);
+    font-weight: 800;
+}
+
+.stroke-card p,
+.rule-card p,
+.tone-card p,
+.character-practice-card p,
+.character-practice-card em {
+    margin-top: 6px;
+    color: var(--muted);
+    font-style: normal;
+    line-height: 1.45;
+}
+
+.rule-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.rule-card {
+    display: grid;
+    grid-template-columns: 38px minmax(0, 1fr);
+    gap: 12px;
+    align-items: start;
+}
+
+.rule-card > strong {
+    display: grid;
+    width: 32px;
+    height: 32px;
+    place-items: center;
+    border-radius: 999px;
+    background: var(--blue);
+    color: #fff;
+    font-size: 0.86rem;
+}
+
+.pinyin-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(260px, 0.9fr);
+    gap: 12px;
+}
+
+.tone-grid {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.tone-card strong {
+    color: var(--ink);
+    font-size: 2rem;
+}
+
+.sound-board {
+    display: grid;
+    align-content: start;
+    gap: 10px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: #f8fbff;
+    padding: 14px;
+}
+
+.sound-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.sound-chips span {
+    display: inline-flex;
+    min-height: 28px;
+    align-items: center;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: #fff;
+    color: var(--blue-dark);
+    font-size: 0.8rem;
+    font-weight: 800;
+    padding: 3px 9px;
+}
+
+.radical-groups {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.radical-group {
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: #f8fbff;
+    padding: 14px;
+}
+
+.radical-list {
+    display: grid;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.radical-row {
+    display: grid;
+    grid-template-columns: minmax(70px, 0.8fr) minmax(48px, 0.5fr) minmax(0, 1fr);
+    gap: 8px;
+    align-items: center;
+    border-top: 1px solid var(--line-soft);
+    padding-top: 8px;
+}
+
+.radical-row strong {
+    color: var(--ink);
+    font-family: 'Noto Sans SC', sans-serif;
+    font-size: 1.2rem;
+}
+
+.radical-row span {
+    color: var(--blue-dark);
+    font-size: 0.8rem;
+    font-weight: 800;
+}
+
+.radical-row p,
+.radical-row em {
+    color: var(--muted);
+    font-size: 0.82rem;
+    font-style: normal;
+}
+
+.radical-row em {
+    grid-column: 1 / -1;
+}
+
+.kangxi-grid {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: 6px;
+}
+
+.kangxi-grid span {
+    display: grid;
+    min-height: 54px;
+    place-items: center;
+    gap: 2px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: #f8fbff;
+}
+
+.kangxi-grid strong {
+    color: var(--ink);
+    font-family: 'Noto Sans SC', sans-serif;
+    font-size: 1.45rem;
+    line-height: 1;
+}
+
+.kangxi-grid em {
+    color: var(--muted);
+    font-size: 0.68rem;
+    font-style: normal;
+    font-weight: 800;
+}
+
+.character-practice-grid {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.character-practice-card {
+    min-height: 170px;
+}
+
+.character-practice-card strong {
+    display: block;
+    font-size: 3.2rem;
 }
 
 .ai-chat {
@@ -1457,7 +1719,7 @@ tbody tr:hover {
     }
 
     .side-nav {
-        grid-template-columns: repeat(6, minmax(0, 1fr));
+        grid-template-columns: repeat(7, minmax(0, 1fr));
         margin-left: auto;
     }
 
@@ -1505,6 +1767,26 @@ tbody tr:hover {
 
     .level-chips {
         grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .stroke-grid,
+    .radical-groups,
+    .kangxi-grid,
+    .character-practice-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .kangxi-grid {
+        grid-template-columns: repeat(8, minmax(0, 1fr));
+    }
+
+    .pinyin-layout,
+    .rule-list {
+        grid-template-columns: 1fr;
+    }
+
+    .tone-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 
     .test-level-tabs {
@@ -1588,6 +1870,7 @@ tbody tr:hover {
     .exam-actions,
     .exam-footer,
     .test-toolbar,
+    .writing-toolbar,
     .ai-toolbar,
     .test-set-header {
         align-items: stretch;
@@ -1640,9 +1923,23 @@ tbody tr:hover {
 
     .summary-row,
     .level-chips,
+    .stroke-grid,
+    .tone-grid,
+    .radical-groups,
+    .kangxi-grid,
+    .character-practice-grid,
     .test-level-tabs,
     .mode-tabs,
     .standard-tabs {
+        grid-template-columns: 1fr;
+    }
+
+    .kangxi-grid {
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
+
+    .stroke-card,
+    .radical-row {
         grid-template-columns: 1fr;
     }
 

@@ -19,6 +19,78 @@ const progressStorageKey = 'hskMasteryProgress.v1';
 const statsStorageKey = 'hskMasteryStats.v1';
 const dailyGoalTarget = 20;
 const reviewIntervals = [1, 3, 7, 14, 30];
+const strokeBasics = [
+    { mark: '一', name: 'Ngang', pinyin: 'heng', tip: 'Viết từ trái sang phải.' },
+    { mark: '丨', name: 'Sổ', pinyin: 'shu', tip: 'Viết từ trên xuống dưới.' },
+    { mark: '丿', name: 'Phẩy', pinyin: 'pie', tip: 'Kéo chéo xuống bên trái.' },
+    { mark: '丶', name: 'Chấm', pinyin: 'dian', tip: 'Đặt nét ngắn, dứt khoát.' },
+    { mark: '㇏', name: 'Mác', pinyin: 'na', tip: 'Kéo chéo xuống bên phải.' },
+    { mark: '㇀', name: 'Hất', pinyin: 'ti', tip: 'Hất lên nhanh ở cuối nét.' },
+    { mark: '㇆', name: 'Móc', pinyin: 'gou', tip: 'Đổi hướng và móc ở cuối nét.' },
+    { mark: '㇕', name: 'Gập', pinyin: 'zhe', tip: 'Gập góc, không nhấc bút giữa nét.' },
+];
+const strokeRules = [
+    { rule: 'Ngang trước, sổ sau', example: '十: 一 rồi 丨' },
+    { rule: 'Phẩy trước, mác sau', example: '人: 丿 rồi ㇏' },
+    { rule: 'Trên trước, dưới sau', example: '三: nét trên rồi đến nét dưới' },
+    { rule: 'Trái trước, phải sau', example: '你: 亻 trước, 尔 sau' },
+    { rule: 'Ngoài trước, trong sau', example: '同: khung ngoài rồi phần trong' },
+    { rule: 'Vào trong trước, đóng khung sau', example: '国: viết 玉 rồi đóng nét dưới' },
+    { rule: 'Giữa trước, hai bên sau', example: '小: 丨 trước rồi hai chấm' },
+];
+const toneGuide = [
+    { tone: '1', mark: 'mā', shape: 'cao ngang', cue: 'Giữ giọng đều và cao.' },
+    { tone: '2', mark: 'má', shape: 'đi lên', cue: 'Giống khi hỏi lại: hả?' },
+    { tone: '3', mark: 'mǎ', shape: 'xuống rồi lên', cue: 'Hạ giọng thấp, rồi nhấc lên nhẹ.' },
+    { tone: '4', mark: 'mà', shape: 'rơi mạnh', cue: 'Ngắn, dứt khoát như ra lệnh.' },
+    { tone: '0', mark: 'ma', shape: 'nhẹ', cue: 'Đọc nhẹ, ngắn, không nhấn.' },
+];
+const pinyinInitials = ['b', 'p', 'm', 'f', 'd', 't', 'n', 'l', 'g', 'k', 'h', 'j', 'q', 'x', 'zh', 'ch', 'sh', 'r', 'z', 'c', 's', 'y', 'w'];
+const pinyinFinals = ['a', 'o', 'e', 'i', 'u', 'ü', 'ai', 'ei', 'ao', 'ou', 'an', 'en', 'ang', 'eng', 'ong', 'ia', 'ie', 'iao', 'iu', 'ian', 'in', 'iang', 'ing', 'iong', 'ua', 'uo', 'uai', 'ui', 'uan', 'un', 'uang', 'ueng', 'üe', 'üan', 'ün'];
+const kangxiRadicals = Array.from({ length: 214 }, (_, index) => ({
+    number: index + 1,
+    symbol: String.fromCodePoint(0x2f00 + index),
+}));
+const radicalGroups = [
+    {
+        title: 'Con người & hành động',
+        items: [
+            { radical: '人 / 亻', pinyin: 'ren', meaning: 'người', examples: '你, 他, 休' },
+            { radical: '口', pinyin: 'kou', meaning: 'miệng, nói', examples: '吗, 吃, 叫' },
+            { radical: '心 / 忄', pinyin: 'xin', meaning: 'tim, cảm xúc', examples: '想, 忙, 怕' },
+            { radical: '手 / 扌', pinyin: 'shou', meaning: 'tay, hành động', examples: '打, 找, 把' },
+            { radical: '足', pinyin: 'zu', meaning: 'chân, di chuyển', examples: '跑, 路, 跟' },
+        ],
+    },
+    {
+        title: 'Tự nhiên & vật chất',
+        items: [
+            { radical: '水 / 氵', pinyin: 'shui', meaning: 'nước', examples: '没, 河, 洗' },
+            { radical: '火 / 灬', pinyin: 'huo', meaning: 'lửa, nhiệt', examples: '热, 点, 照' },
+            { radical: '木', pinyin: 'mu', meaning: 'cây, gỗ', examples: '杯, 校, 林' },
+            { radical: '土', pinyin: 'tu', meaning: 'đất', examples: '地, 城, 坐' },
+            { radical: '金 / 钅', pinyin: 'jin', meaning: 'kim loại, tiền', examples: '钱, 钟, 银' },
+        ],
+    },
+    {
+        title: 'Nhận thức & đời sống',
+        items: [
+            { radical: '日', pinyin: 'ri', meaning: 'mặt trời, ngày', examples: '明, 时, 昨' },
+            { radical: '月', pinyin: 'yue', meaning: 'trăng, thịt/cơ thể', examples: '朋, 服, 脑' },
+            { radical: '目', pinyin: 'mu', meaning: 'mắt, nhìn', examples: '看, 睡, 眼' },
+            { radical: '言 / 讠', pinyin: 'yan', meaning: 'lời nói', examples: '说, 语, 请' },
+            { radical: '食 / 饣', pinyin: 'shi', meaning: 'ăn uống', examples: '饭, 饮, 饿' },
+        ],
+    },
+];
+const writingPracticeWords = [
+    { hanzi: '你', pinyin: 'ni3', display: 'nǐ', radical: '亻', hint: 'Trái trước phải sau: 亻 rồi 尔.' },
+    { hanzi: '好', pinyin: 'hao3', display: 'hǎo', radical: '女', hint: '女 bên trái, 子 bên phải.' },
+    { hanzi: '学', pinyin: 'xue2', display: 'xué', radical: '子', hint: 'Trên trước dưới sau; nhớ phần 子 ở dưới.' },
+    { hanzi: '喝', pinyin: 'he1', display: 'hē', radical: '口', hint: 'Bộ 口 gợi nghĩa liên quan miệng/uống.' },
+    { hanzi: '想', pinyin: 'xiang3', display: 'xiǎng', radical: '心', hint: '心 ở dưới gợi nghĩa suy nghĩ/cảm xúc.' },
+    { hanzi: '钱', pinyin: 'qian2', display: 'qián', radical: '钅', hint: '钅 liên quan kim loại/tiền.' },
+];
 
 let currentMode = 'vocab';
 let currentStandard = 'new';
@@ -42,6 +114,7 @@ const els = {
     navReview: document.getElementById('navReview'),
     navExam: document.getElementById('navExam'),
     navTests: document.getElementById('navTests'),
+    navWriting: document.getElementById('navWriting'),
     navAi: document.getElementById('navAi'),
     coursePanel: document.getElementById('coursePanel'),
     btnVocab: document.getElementById('btnVocab'),
@@ -77,6 +150,8 @@ const els = {
     testPanel: document.getElementById('testPanel'),
     testList: document.getElementById('testList'),
     testStudyLevel: document.getElementById('testStudyLevel'),
+    writingPanel: document.getElementById('writingPanel'),
+    writingContent: document.getElementById('writingContent'),
     aiPanel: document.getElementById('aiPanel'),
     aiMessages: document.getElementById('aiMessages'),
     aiQuickPrompts: document.getElementById('aiQuickPrompts'),
@@ -145,6 +220,10 @@ const routeConfig = {
         panel: 'testPanel',
         forceVocab: true,
     },
+    writing: {
+        nav: 'navWriting',
+        panel: 'writingPanel',
+    },
     ai: {
         nav: 'navAi',
         panel: 'aiPanel',
@@ -162,6 +241,7 @@ els.navDecks.addEventListener('click', () => {
 els.navReview.addEventListener('click', () => showReviewRoute());
 els.navExam.addEventListener('click', () => showExamRoute());
 els.navTests.addEventListener('click', () => showTestRoute());
+els.navWriting.addEventListener('click', () => showWritingRoute());
 els.navAi.addEventListener('click', () => showAiRoute());
 els.btnVocab.addEventListener('click', () => switchMode('vocab'));
 els.btnGrammar.addEventListener('click', () => switchMode('grammar'));
@@ -377,6 +457,11 @@ function showTestRoute() {
     renderTestPage();
 }
 
+function showWritingRoute() {
+    activateRoute('writing');
+    renderWritingPage();
+}
+
 function showAiRoute() {
     activateRoute('ai');
     renderAiPanel();
@@ -385,6 +470,7 @@ function showAiRoute() {
 function activateRoute(route, options = {}) {
     const config = routeConfig[route];
     currentRoute = route;
+    document.body.dataset.route = route;
 
     if (config.forceVocab) {
         forceVocabMode();
@@ -427,6 +513,7 @@ function hideRoutePanels() {
     els.reviewPanel.hidden = true;
     els.examPanel.hidden = true;
     els.testPanel.hidden = true;
+    els.writingPanel.hidden = true;
     els.aiPanel.hidden = true;
 }
 
@@ -739,7 +826,7 @@ function buildReviewControls(key, note) {
 }
 
 function renderEmptyState() {
-    if (currentRoute === 'review' || currentRoute === 'exam' || currentRoute === 'tests' || currentRoute === 'ai') {
+    if (currentRoute === 'review' || currentRoute === 'exam' || currentRoute === 'tests' || currentRoute === 'writing' || currentRoute === 'ai') {
         els.emptyState.hidden = true;
         return;
     }
@@ -1270,6 +1357,138 @@ function getExamScore() {
     }, 0);
 }
 
+function renderWritingPage() {
+    const radicalCount = radicalGroups.reduce((sum, group) => sum + group.items.length, 0);
+
+    els.surfaceTitle.textContent = 'Nền tảng chữ Hán';
+    els.wordCount.textContent = `${radicalCount} bộ thủ`;
+    els.activeLevelLabel.textContent = 'Writing';
+    els.courseTitle.textContent = 'Viết chữ Hán, đọc pinyin, nhớ bộ thủ';
+    els.levelHint.textContent = 'Nắm nét viết và bộ thủ giúp bạn đoán nghĩa, nhớ mặt chữ và tra từ nhanh hơn.';
+    els.resultMeta.textContent = 'Bắt đầu từ nét cơ bản, sau đó luyện thanh điệu và nhận diện bộ thủ trong từ HSK.';
+    els.progressFill.style.width = '100%';
+    renderMotivationStats();
+
+    els.writingContent.innerHTML = `
+        <section class="writing-section writing-practice">
+            <div class="writing-section-title">
+                <span class="review-tag">Luyện viết</span>
+                <h4>8 nét cơ bản</h4>
+            </div>
+            <div class="stroke-grid">
+                ${strokeBasics.map((stroke) => `
+                    <article class="stroke-card">
+                        <strong>${escapeHtml(stroke.mark)}</strong>
+                        <div>
+                            <h5>${escapeHtml(stroke.name)}</h5>
+                            <span>${escapeHtml(stroke.pinyin)}</span>
+                            <p>${escapeHtml(stroke.tip)}</p>
+                        </div>
+                    </article>
+                `).join('')}
+            </div>
+        </section>
+
+        <section class="writing-section">
+            <div class="writing-section-title">
+                <span class="review-tag">Bút thuận</span>
+                <h4>Quy tắc viết dễ nhớ</h4>
+            </div>
+            <div class="rule-list">
+                ${strokeRules.map((item, index) => `
+                    <article class="rule-card">
+                        <strong>${index + 1}</strong>
+                        <div>
+                            <h5>${escapeHtml(item.rule)}</h5>
+                            <p>${escapeHtml(item.example)}</p>
+                        </div>
+                    </article>
+                `).join('')}
+            </div>
+        </section>
+
+        <section class="writing-section">
+            <div class="writing-section-title">
+                <span class="review-tag">Pinyin</span>
+                <h4>Âm đầu, âm cuối và thanh điệu</h4>
+            </div>
+            <div class="pinyin-layout">
+                <div class="tone-grid">
+                    ${toneGuide.map((tone) => `
+                        <article class="tone-card">
+                            <strong>${escapeHtml(tone.mark)}</strong>
+                            <span>Thanh ${escapeHtml(tone.tone)} - ${escapeHtml(tone.shape)}</span>
+                            <p>${escapeHtml(tone.cue)}</p>
+                        </article>
+                    `).join('')}
+                </div>
+                <div class="sound-board">
+                    <h5>Âm đầu</h5>
+                    <div class="sound-chips">${pinyinInitials.map((sound) => `<span>${escapeHtml(sound)}</span>`).join('')}</div>
+                    <h5>Âm cuối</h5>
+                    <div class="sound-chips">${pinyinFinals.map((sound) => `<span>${escapeHtml(sound)}</span>`).join('')}</div>
+                </div>
+            </div>
+        </section>
+
+        <section class="writing-section">
+            <div class="writing-section-title">
+                <span class="review-tag">Bộ thủ</span>
+                <h4>Bộ thủ phổ biến trong HSK</h4>
+            </div>
+            <div class="radical-groups">
+                ${radicalGroups.map((group) => `
+                    <article class="radical-group">
+                        <h5>${escapeHtml(group.title)}</h5>
+                        <div class="radical-list">
+                            ${group.items.map((item) => `
+                                <div class="radical-row">
+                                    <strong>${escapeHtml(item.radical)}</strong>
+                                    <span>${escapeHtml(item.pinyin)}</span>
+                                    <p>${escapeHtml(item.meaning)}</p>
+                                    <em>${escapeHtml(item.examples)}</em>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </article>
+                `).join('')}
+            </div>
+        </section>
+
+        <section class="writing-section">
+            <div class="writing-section-title">
+                <span class="review-tag">Tra cứu</span>
+                <h4>214 bộ thủ Kangxi</h4>
+            </div>
+            <div class="kangxi-grid">
+                ${kangxiRadicals.map((item) => `
+                    <span title="Radical ${item.number}">
+                        <strong>${escapeHtml(item.symbol)}</strong>
+                        <em>${item.number}</em>
+                    </span>
+                `).join('')}
+            </div>
+        </section>
+
+        <section class="writing-section">
+            <div class="writing-section-title">
+                <span class="review-tag">Ứng dụng</span>
+                <h4>6 chữ nên luyện hôm nay</h4>
+            </div>
+            <div class="character-practice-grid">
+                ${writingPracticeWords.map((item) => `
+                    <article class="character-practice-card">
+                        <strong>${escapeHtml(item.hanzi)}</strong>
+                        <span>${escapeHtml(item.display)} / ${escapeHtml(item.pinyin)}</span>
+                        <p>Bộ: ${escapeHtml(item.radical)}</p>
+                        <em>${escapeHtml(item.hint)}</em>
+                    </article>
+                `).join('')}
+            </div>
+        </section>
+    `;
+}
+
 function renderAiPanel(keepConversation = true) {
     const levelName = formatLevel(currentLevel);
     const vocabItems = getData('vocab', currentLevel);
@@ -1440,6 +1659,7 @@ function formatLevel(level) {
 }
 
 function init() {
+    document.body.dataset.route = currentRoute;
     els.searchInput.placeholder = tableConfig[currentMode].placeholder;
     renderMotivationStats();
     loadLevel();

@@ -7,7 +7,7 @@
     <meta name="description" content="Ứng dụng học từ vựng và ngữ pháp HSK bằng flashcard, pinyin và nghĩa tiếng Việt">
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%E4%B9%A6%3C/text%3E%3C/svg%3E">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="./css/style.css?v=20260704-ai-tutor">
+    <link rel="stylesheet" href="./css/style.css?v=20260704-writing">
 </head>
 <body>
     <div class="app-shell">
@@ -40,6 +40,10 @@
                 <button class="side-link" id="navTests" type="button">
                     <span aria-hidden="true">▣</span>
                     Đề thi
+                </button>
+                <button class="side-link" id="navWriting" type="button">
+                    <span aria-hidden="true">文</span>
+                    Chữ Hán
                 </button>
                 <button class="side-link" id="navAi" type="button">
                     <span aria-hidden="true">✦</span>
@@ -242,6 +246,17 @@
                         </form>
                     </div>
 
+                    <div class="writing-panel" id="writingPanel" hidden>
+                        <div class="writing-toolbar">
+                            <div>
+                                <span class="review-tag">Nền tảng chữ Hán</span>
+                                <h4>Cách viết, pinyin, phát âm và bộ thủ</h4>
+                                <p>Học cách nhìn chữ theo nét, đọc âm theo pinyin và nhận diện bộ thủ để nhớ từ nhanh hơn.</p>
+                            </div>
+                        </div>
+                        <div class="writing-content" id="writingContent"></div>
+                    </div>
+
                     <div class="content-area">
                         <div class="table-wrapper" id="tableWrapper" hidden>
                             <table>
@@ -260,6 +275,6 @@
         </main>
     </div>
 
-    <script type="module" src="./js/app.js?v=20260704-ai-tutor"></script>
+    <script type="module" src="./js/app.js?v=20260704-writing"></script>
 </body>
 </html>
