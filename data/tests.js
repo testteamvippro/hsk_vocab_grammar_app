@@ -1,50 +1,30 @@
-export const testData = [
-    {
-        level: 'hsk1',
-        title: 'HSK 1 - H10901',
-        pdf: './data/H10901.pdf',
-        audio: './data/H10901.mp3',
-        pages: 10,
-        note: 'Full paper with listening audio.',
-    },
-    {
-        level: 'hsk2',
-        title: 'HSK 2 - Đề số 1',
-        pdf: './data/Đề thi HSK 2- Số 1.pdf',
-        audio: './data/Đề HSK 2 số 1 file nghe.mp3',
-        pages: null,
-        note: 'Vietnamese-named practice paper with listening audio.',
-    },
-    {
-        level: 'hsk3',
-        title: 'HSK 3 - H30000',
-        pdf: './data/H30000.pdf',
-        audio: './data/H30000.mp3',
-        pages: 15,
-        note: 'Full paper with listening audio.',
-    },
-    {
-        level: 'hsk4',
-        title: 'HSK 4 - Đề 1',
-        pdf: './data/Copy of Đề thi HSK 4- đề 1.pdf',
-        audio: './data/Copy of nghe.mp3',
-        pages: 24,
-        note: 'Practice paper with listening audio.',
-    },
-    {
-        level: 'hsk5',
-        title: 'HSK 5 - H51001',
-        pdf: './data/H51001.pdf',
-        audio: './data/H51001.mp3',
-        pages: 17,
-        note: 'Full paper with listening audio.',
-    },
-    {
-        level: 'hsk6',
-        title: 'HSK 6 - H60000',
-        pdf: './data/H60000.pdf',
-        audio: './data/H60000.mp3',
-        pages: 19,
-        note: 'Full paper with listening audio.',
-    },
+const testSets = [
+    { level: 'hsk1', pages: [10, 10, 10, 10, 10] },
+    { level: 'hsk2', pages: [null, null, null, null, null] },
+    { level: 'hsk3', pages: [15, 22, 22, 14, 14] },
+    { level: 'hsk4', pages: [24, 24, 24, 24, 24], audioMissing: [5] },
+    { level: 'hsk5', pages: [17, 17, 17, 17, 17] },
+    { level: 'hsk6', pages: [19, 18, 18, 18, 18] },
 ];
+
+export const testData = testSets.flatMap((set) => {
+    return Array.from({ length: 5 }, (_, index) => {
+        const number = index + 1;
+        const padded = String(number).padStart(2, '0');
+        const hasAudio = !(set.audioMissing || []).includes(number);
+
+        return {
+            level: set.level,
+            number,
+            title: `${formatLevel(set.level)} - Test ${padded}`,
+            pdf: `./data/${set.level}-test-${padded}.pdf`,
+            audio: hasAudio ? `./data/${set.level}-test-${padded}.mp3` : '',
+            pages: set.pages[index],
+            note: hasAudio ? 'Full paper with listening audio.' : 'PDF paper only. Listening audio is not available yet.',
+        };
+    });
+});
+
+function formatLevel(level) {
+    return `HSK ${Number(level.replace('hsk', ''))}`;
+}

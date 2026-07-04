@@ -1175,6 +1175,19 @@ tbody tr:hover {
     min-height: 38px;
 }
 
+.audio-missing {
+    display: grid;
+    min-height: 38px;
+    place-items: center;
+    border: 1px dashed var(--line);
+    border-radius: var(--radius);
+    background: #f8fafc;
+    color: var(--muted);
+    font-size: 0.84rem;
+    font-weight: 800;
+    text-align: center;
+}
+
 .test-actions {
     display: flex;
     flex-wrap: wrap;

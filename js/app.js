@@ -947,25 +947,43 @@ function renderExamSetup() {
 
 function renderTestPage() {
     const activeLevelNumber = getLevelNumber(currentLevel);
-    const activeTest = testData.find((test) => getLevelNumber(test.level) === activeLevelNumber);
+    const activeTests = getTestsForCurrentLevel();
+    const activeTest = activeTests[0];
 
     els.surfaceTitle.textContent = 'Đề thi đầy đủ';
     els.activeLevelLabel.textContent = formatLevel(currentLevel);
     els.courseTitle.textContent = `Bộ đề ${formatLevel(currentLevel)} - ${standards[currentStandard].label}`;
     els.levelHint.textContent = activeTest
-        ? `${activeTest.title}: mở PDF, bật audio, rồi tự chấm theo file đề.`
+        ? `${activeTests.length} đề cho ${formatLevel(currentLevel)}. Mở PDF, bật audio, rồi tự chấm theo file đề.`
         : `Chưa có file đề thi cho ${formatLevel(currentLevel)}.`;
-    els.resultMeta.textContent = `${testData.length} bộ đề PDF + audio đã được tìm thấy trong thư mục data.`;
-    els.wordCount.textContent = `${testData.length} đề`;
+    els.resultMeta.textContent = activeTests.length
+        ? `${activeTests.length} đề đang sẵn sàng cho ${formatLevel(currentLevel)}. Tổng cộng có ${testData.length} đề trong thư viện.`
+        : `${testData.length} bộ đề đã được tìm thấy trong thư mục data.`;
+    els.wordCount.textContent = `${activeTests.length || testData.length} đề`;
     els.progressFill.style.width = activeTest ? '100%' : '0%';
 
-    els.testList.innerHTML = testData.map((test) => buildTestCard(test, getLevelNumber(test.level) === activeLevelNumber)).join('');
+    els.testList.innerHTML = activeTests.length
+        ? activeTests.map((test) => buildTestCard(test, true)).join('')
+        : buildNoTestsState();
     renderMotivationStats();
+}
+
+function getTestsForCurrentLevel() {
+    const activeLevelNumber = getLevelNumber(currentLevel);
+    return testData.filter((test) => getLevelNumber(test.level) === activeLevelNumber);
 }
 
 function buildTestCard(test, isActive) {
     const pageLabel = test.pages ? `${test.pages} trang` : 'PDF';
     const activeLabel = isActive ? '<span class="test-active-label">Đang chọn</span>' : '';
+    const audioMarkup = test.audio
+        ? `<audio controls preload="none" src="${escapeHtml(test.audio)}"></audio>`
+        : '<div class="audio-missing">Chưa có audio cho đề này</div>';
+    const audioAction = test.audio
+        ? `<a class="ghost-light-action" href="${escapeHtml(test.audio)}" target="_blank" rel="noopener">Mở audio</a>`
+        : '';
+    const audioMeta = test.audio ? 'Listening MP3' : 'PDF only';
+
     return `
         <article class="test-card${isActive ? ' active' : ''}">
             <div class="test-card-main">
@@ -977,18 +995,27 @@ function buildTestCard(test, isActive) {
                 <p>${escapeHtml(test.note)}</p>
                 <div class="test-meta">
                     <span>${escapeHtml(pageLabel)}</span>
-                    <span>Listening MP3</span>
+                    <span>${escapeHtml(audioMeta)}</span>
                     <span>PDF paper</span>
                 </div>
             </div>
             <div class="test-player">
-                <audio controls preload="none" src="${escapeHtml(test.audio)}"></audio>
+                ${audioMarkup}
                 <div class="test-actions">
                     <a class="primary-action" href="${escapeHtml(test.pdf)}" target="_blank" rel="noopener">Mở PDF</a>
-                    <a class="ghost-light-action" href="${escapeHtml(test.audio)}" target="_blank" rel="noopener">Mở audio</a>
+                    ${audioAction}
                 </div>
             </div>
         </article>
+    `;
+}
+
+function buildNoTestsState() {
+    return `
+        <div class="review-empty">
+            <strong>Chưa có đề cho cấp này</strong>
+            <span>Thêm PDF và MP3 vào thư mục data, rồi khai báo trong data/tests.js.</span>
+        </div>
     `;
 }
 
