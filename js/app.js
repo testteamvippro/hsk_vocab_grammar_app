@@ -233,6 +233,14 @@ els.examBody.addEventListener('click', (event) => {
     }
 });
 
+els.testPanel.addEventListener('click', (event) => {
+    const levelButton = event.target.closest('[data-test-level]');
+    if (!levelButton) return;
+    currentLevel = getLevelKeyForNumber(Number(levelButton.dataset.testLevel));
+    renderLevelChips();
+    renderTestPage();
+});
+
 els.levelChips.addEventListener('click', (event) => {
     const chip = event.target.closest('.level-chip');
     if (!chip) return;
@@ -963,9 +971,39 @@ function renderTestPage() {
     els.progressFill.style.width = activeTest ? '100%' : '0%';
 
     els.testList.innerHTML = activeTests.length
-        ? activeTests.map((test) => buildTestCard(test, true)).join('')
+        ? `
+            ${buildTestLevelTabs(activeLevelNumber)}
+            <div class="test-set-header">
+                <div>
+                    <span class="review-tag">${escapeHtml(formatLevel(currentLevel))}</span>
+                    <h4>${activeTests.length} đề thi đầy đủ</h4>
+                    <p>Mỗi đề gồm file PDF${activeTests.some((test) => test.audio) ? ' và audio nghe' : ''}. Làm lần lượt từ Test 01 đến Test 05 để mô phỏng luyện đề thật.</p>
+                </div>
+                <strong>${activeTests.length}/5</strong>
+            </div>
+            <div class="test-grid">
+                ${activeTests.map((test) => buildTestCard(test)).join('')}
+            </div>
+        `
         : buildNoTestsState();
     renderMotivationStats();
+}
+
+function buildTestLevelTabs(activeLevelNumber) {
+    return `
+        <div class="test-level-tabs" aria-label="Chọn cấp đề thi">
+            ${Array.from({ length: 6 }, (_, index) => {
+                const levelNumber = index + 1;
+                const count = testData.filter((test) => getLevelNumber(test.level) === levelNumber).length;
+                return `
+                    <button class="test-level-tab${levelNumber === activeLevelNumber ? ' active' : ''}" type="button" data-test-level="${levelNumber}">
+                        HSK ${levelNumber}
+                        <span>${count} đề</span>
+                    </button>
+                `;
+            }).join('')}
+        </div>
+    `;
 }
 
 function getTestsForCurrentLevel() {
@@ -973,9 +1011,8 @@ function getTestsForCurrentLevel() {
     return testData.filter((test) => getLevelNumber(test.level) === activeLevelNumber);
 }
 
-function buildTestCard(test, isActive) {
+function buildTestCard(test) {
     const pageLabel = test.pages ? `${test.pages} trang` : 'PDF';
-    const activeLabel = isActive ? '<span class="test-active-label">Đang chọn</span>' : '';
     const audioMarkup = test.audio
         ? `<audio controls preload="none" src="${escapeHtml(test.audio)}"></audio>`
         : '<div class="audio-missing">Chưa có audio cho đề này</div>';
@@ -985,11 +1022,11 @@ function buildTestCard(test, isActive) {
     const audioMeta = test.audio ? 'Listening MP3' : 'PDF only';
 
     return `
-        <article class="test-card${isActive ? ' active' : ''}">
+        <article class="test-card">
             <div class="test-card-main">
                 <div class="test-card-topline">
-                    <span class="review-tag">${escapeHtml(formatLevel(test.level))}</span>
-                    ${activeLabel}
+                    <span class="review-tag">Test ${String(test.number).padStart(2, '0')}</span>
+                    <span class="test-active-label">${escapeHtml(formatLevel(test.level))}</span>
                 </div>
                 <h4>${escapeHtml(test.title)}</h4>
                 <p>${escapeHtml(test.note)}</p>
@@ -1008,6 +1045,12 @@ function buildTestCard(test, isActive) {
             </div>
         </article>
     `;
+}
+
+function getLevelKeyForNumber(levelNumber) {
+    const suffix = currentStandard === 'old' ? 'Old' : 'New';
+    const preferred = `hsk${levelNumber}${suffix}`;
+    return getData('vocab', preferred).length ? preferred : `hsk${levelNumber}`;
 }
 
 function buildNoTestsState() {

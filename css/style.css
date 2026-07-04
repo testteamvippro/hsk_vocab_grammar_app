@@ -1111,6 +1111,72 @@ tbody tr:hover {
 
 .test-list {
     display: grid;
+    gap: 14px;
+}
+
+.test-level-tabs {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.test-level-tab {
+    display: grid;
+    min-height: 54px;
+    align-content: center;
+    gap: 2px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: #fff;
+    color: var(--ink);
+    font-size: 0.86rem;
+    font-weight: 800;
+    text-align: center;
+}
+
+.test-level-tab span {
+    color: var(--muted);
+    font-size: 0.72rem;
+}
+
+.test-level-tab:hover,
+.test-level-tab.active {
+    border-color: var(--blue);
+    background: var(--blue-soft);
+    color: var(--blue-dark);
+}
+
+.test-set-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: #f8fbff;
+    padding: 16px;
+}
+
+.test-set-header h4 {
+    margin-top: 8px;
+    color: var(--ink);
+    font-size: 1.25rem;
+}
+
+.test-set-header p {
+    margin-top: 4px;
+    color: var(--muted);
+}
+
+.test-set-header strong {
+    color: var(--blue-dark);
+    font-size: 2rem;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.test-grid {
+    display: grid;
     gap: 10px;
 }
 
@@ -1331,6 +1397,10 @@ tbody tr:hover {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
+    .test-level-tabs {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
     .deck-actions {
         grid-template-columns: 52px minmax(0, 1fr) 52px;
     }
@@ -1408,7 +1478,8 @@ tbody tr:hover {
 
     .exam-actions,
     .exam-footer,
-    .test-toolbar {
+    .test-toolbar,
+    .test-set-header {
         align-items: stretch;
         flex-direction: column;
     }
@@ -1455,6 +1526,7 @@ tbody tr:hover {
 
     .summary-row,
     .level-chips,
+    .test-level-tabs,
     .mode-tabs,
     .standard-tabs {
         grid-template-columns: 1fr;
