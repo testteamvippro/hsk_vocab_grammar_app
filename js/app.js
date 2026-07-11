@@ -107,6 +107,9 @@ let progressState = loadProgressState();
 let statsState = loadStatsState();
 let currentExam = null;
 let aiMessages = [];
+let videoObjectUrl = '';
+let subtitleCues = [];
+let activeSubtitleIndex = -1;
 
 const els = {
     navStudy: document.getElementById('navStudy'),
@@ -114,6 +117,7 @@ const els = {
     navReview: document.getElementById('navReview'),
     navExam: document.getElementById('navExam'),
     navTests: document.getElementById('navTests'),
+    navVideo: document.getElementById('navVideo'),
     navWriting: document.getElementById('navWriting'),
     navAi: document.getElementById('navAi'),
     coursePanel: document.getElementById('coursePanel'),
@@ -150,6 +154,19 @@ const els = {
     testPanel: document.getElementById('testPanel'),
     testList: document.getElementById('testList'),
     testStudyLevel: document.getElementById('testStudyLevel'),
+    videoPanel: document.getElementById('videoPanel'),
+    learningVideo: document.getElementById('learningVideo'),
+    videoFileInput: document.getElementById('videoFileInput'),
+    subtitleFileInput: document.getElementById('subtitleFileInput'),
+    subtitleText: document.getElementById('subtitleText'),
+    loadSubtitleText: document.getElementById('loadSubtitleText'),
+    subtitleOverlay: document.getElementById('subtitleOverlay'),
+    activeSubtitleTime: document.getElementById('activeSubtitleTime'),
+    activeSubtitleText: document.getElementById('activeSubtitleText'),
+    activeSubtitleTranslation: document.getElementById('activeSubtitleTranslation'),
+    videoVocabCount: document.getElementById('videoVocabCount'),
+    videoVocabList: document.getElementById('videoVocabList'),
+    subtitleList: document.getElementById('subtitleList'),
     writingPanel: document.getElementById('writingPanel'),
     writingContent: document.getElementById('writingContent'),
     aiPanel: document.getElementById('aiPanel'),
@@ -220,6 +237,11 @@ const routeConfig = {
         panel: 'testPanel',
         forceVocab: true,
     },
+    video: {
+        nav: 'navVideo',
+        panel: 'videoPanel',
+        forceVocab: true,
+    },
     writing: {
         nav: 'navWriting',
         panel: 'writingPanel',
@@ -241,6 +263,7 @@ els.navDecks.addEventListener('click', () => {
 els.navReview.addEventListener('click', () => showReviewRoute());
 els.navExam.addEventListener('click', () => showExamRoute());
 els.navTests.addEventListener('click', () => showTestRoute());
+els.navVideo.addEventListener('click', () => showVideoRoute());
 els.navWriting.addEventListener('click', () => showWritingRoute());
 els.navAi.addEventListener('click', () => showAiRoute());
 els.btnVocab.addEventListener('click', () => switchMode('vocab'));
@@ -336,6 +359,22 @@ els.testPanel.addEventListener('click', (event) => {
     renderTestPage();
 });
 
+els.videoFileInput.addEventListener('change', handleVideoFileChange);
+els.subtitleFileInput.addEventListener('change', handleSubtitleFileChange);
+els.loadSubtitleText.addEventListener('click', () => loadSubtitleText(els.subtitleText.value));
+els.learningVideo.addEventListener('timeupdate', syncSubtitleToVideo);
+els.learningVideo.addEventListener('seeked', syncSubtitleToVideo);
+els.subtitleList.addEventListener('click', (event) => {
+    const cueButton = event.target.closest('[data-subtitle-index]');
+    if (!cueButton) return;
+    const cue = subtitleCues[Number(cueButton.dataset.subtitleIndex)];
+    if (!cue) return;
+    els.learningVideo.currentTime = cue.start;
+    activeSubtitleIndex = -1;
+    syncSubtitleToVideo();
+    els.learningVideo.play().catch(() => {});
+});
+
 els.aiQuickPrompts.addEventListener('click', (event) => {
     const promptButton = event.target.closest('[data-ai-prompt]');
     if (!promptButton) return;
@@ -359,6 +398,11 @@ els.levelChips.addEventListener('click', (event) => {
     if (currentRoute === 'tests') {
         renderLevelChips();
         renderTestPage();
+        return;
+    }
+    if (currentRoute === 'video') {
+        renderLevelChips();
+        renderActiveSubtitle();
         return;
     }
     if (currentRoute === 'ai') {
@@ -400,8 +444,9 @@ function switchStandard(standard) {
 
     const wasExam = currentRoute === 'exam';
     const wasTests = currentRoute === 'tests';
+    const wasVideo = currentRoute === 'video';
     const wasAi = currentRoute === 'ai';
-    if (!wasExam && !wasTests && !wasAi) showStudyRoute(false);
+    if (!wasExam && !wasTests && !wasVideo && !wasAi) showStudyRoute(false);
     currentStandard = standard;
     currentLevel = getFirstPopulatedLevel(currentMode);
     els.btnHskNew.classList.toggle('active', standard === 'new');
@@ -414,6 +459,11 @@ function switchStandard(standard) {
     if (wasTests) {
         renderLevelChips();
         renderTestPage();
+        return;
+    }
+    if (wasVideo) {
+        renderLevelChips();
+        renderActiveSubtitle();
         return;
     }
     if (wasAi) {
@@ -455,6 +505,11 @@ function showExamRoute() {
 function showTestRoute() {
     activateRoute('tests');
     renderTestPage();
+}
+
+function showVideoRoute() {
+    activateRoute('video');
+    renderVideoPanel();
 }
 
 function showWritingRoute() {
@@ -513,6 +568,7 @@ function hideRoutePanels() {
     els.reviewPanel.hidden = true;
     els.examPanel.hidden = true;
     els.testPanel.hidden = true;
+    els.videoPanel.hidden = true;
     els.writingPanel.hidden = true;
     els.aiPanel.hidden = true;
 }
@@ -1348,6 +1404,179 @@ function renderExamResult() {
     `;
     els.progressFill.style.width = `${percent}%`;
     els.levelHint.textContent = `Điểm vừa rồi: ${score}/${total} (${percent}%).`;
+}
+
+function renderVideoPanel() {
+    els.surfaceTitle.textContent = 'Video phụ đề';
+    els.wordCount.textContent = `${subtitleCues.length} câu`;
+    els.activeLevelLabel.textContent = 'Video';
+    els.courseTitle.textContent = 'Học HSK bằng video và phụ đề';
+    els.levelHint.textContent = 'Tải video từ máy, thêm phụ đề SRT/VTT, rồi bấm từng câu để nghe lại và học từ trong ngữ cảnh.';
+    els.resultMeta.textContent = subtitleCues.length
+        ? `Đã có ${subtitleCues.length} dòng phụ đề. Từ vựng được dò theo cấp HSK đang chọn.`
+        : 'Chưa có phụ đề. Bạn có thể tải file .srt/.vtt hoặc dán nội dung có mốc thời gian.';
+    els.progressFill.style.width = subtitleCues.length ? '100%' : '24%';
+    renderMotivationStats();
+    renderSubtitleList();
+    renderActiveSubtitle();
+}
+
+function handleVideoFileChange(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (videoObjectUrl) URL.revokeObjectURL(videoObjectUrl);
+    videoObjectUrl = URL.createObjectURL(file);
+    els.learningVideo.src = videoObjectUrl;
+    els.learningVideo.load();
+    els.resultMeta.textContent = `Đã chọn video: ${file.name}. Thêm phụ đề để bắt đầu học theo câu.`;
+}
+
+function handleSubtitleFileChange(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.addEventListener('load', () => {
+        const text = String(reader.result || '');
+        els.subtitleText.value = text;
+        loadSubtitleText(text, file.name);
+    });
+    reader.readAsText(file);
+}
+
+function loadSubtitleText(rawText, sourceName = 'nội dung đã dán') {
+    subtitleCues = parseSubtitleCues(rawText);
+    activeSubtitleIndex = -1;
+    renderVideoPanel();
+    els.resultMeta.textContent = subtitleCues.length
+        ? `Đã tạo ${subtitleCues.length} dòng phụ đề từ ${sourceName}.`
+        : 'Chưa đọc được phụ đề. Hãy dùng định dạng SRT/VTT có dòng thời gian dạng 00:00:01 --> 00:00:04.';
+    syncSubtitleToVideo();
+}
+
+function parseSubtitleCues(rawText) {
+    const normalized = String(rawText || '')
+        .replace(/\r/g, '')
+        .replace(/^\uFEFF/, '')
+        .replace(/^WEBVTT.*\n/i, '')
+        .trim();
+    if (!normalized) return [];
+
+    return normalized
+        .split(/\n{2,}/)
+        .map(parseSubtitleBlock)
+        .filter(Boolean)
+        .sort((a, b) => a.start - b.start);
+}
+
+function parseSubtitleBlock(block) {
+    const lines = block.split('\n').map((line) => line.trim()).filter(Boolean);
+    const timeIndex = lines.findIndex((line) => line.includes('-->'));
+    if (timeIndex === -1) return null;
+
+    const [startRaw, endRaw] = lines[timeIndex].split('-->').map((part) => part.trim().split(/\s+/)[0]);
+    const start = parseSubtitleTime(startRaw);
+    const end = parseSubtitleTime(endRaw);
+    if (!Number.isFinite(start) || !Number.isFinite(end)) return null;
+
+    const textLines = lines.slice(timeIndex + 1);
+    const chineseLines = textLines.filter((line) => /[\u3400-\u9fff]/.test(line));
+    const translationLines = textLines.filter((line) => !/[\u3400-\u9fff]/.test(line));
+
+    return {
+        start,
+        end,
+        text: chineseLines.join(' ') || textLines[0] || '',
+        translation: translationLines.join(' ') || textLines.slice(1).join(' '),
+        rawText: textLines.join(' '),
+    };
+}
+
+function parseSubtitleTime(value) {
+    const parts = String(value || '').replace(',', '.').split(':');
+    if (parts.length < 2) return Number.NaN;
+    const seconds = Number(parts.pop());
+    const minutes = Number(parts.pop());
+    const hours = Number(parts.pop() || 0);
+    return hours * 3600 + minutes * 60 + seconds;
+}
+
+function syncSubtitleToVideo() {
+    if (!subtitleCues.length) {
+        renderActiveSubtitle();
+        return;
+    }
+
+    const time = els.learningVideo.currentTime || 0;
+    const nextIndex = subtitleCues.findIndex((cue) => time >= cue.start && time <= cue.end);
+    if (nextIndex === activeSubtitleIndex) return;
+
+    activeSubtitleIndex = nextIndex;
+    renderActiveSubtitle();
+    renderSubtitleList();
+}
+
+function renderActiveSubtitle() {
+    const cue = subtitleCues[activeSubtitleIndex] || null;
+    els.subtitleOverlay.textContent = cue ? cue.text : (subtitleCues.length ? '...' : 'Chưa có phụ đề.');
+    els.activeSubtitleTime.textContent = cue ? `${formatCueTime(cue.start)} - ${formatCueTime(cue.end)}` : '00:00';
+    els.activeSubtitleText.textContent = cue ? cue.text : 'Chọn video và thêm phụ đề để bắt đầu.';
+    els.activeSubtitleTranslation.textContent = cue?.translation || (cue ? 'Không có dòng dịch riêng trong phụ đề này.' : 'Các câu phụ đề sẽ hiện theo thời gian video.');
+    renderVideoVocabulary(cue);
+}
+
+function renderVideoVocabulary(cue) {
+    const matches = cue ? getVideoVocabularyMatches(cue.rawText || cue.text) : [];
+    els.videoVocabCount.textContent = `${matches.length} từ`;
+    els.videoVocabList.innerHTML = matches.length
+        ? matches.map((item) => `
+            <article class="video-vocab-item">
+                <strong>${escapeHtml(item.hanzi)}</strong>
+                <span>${escapeHtml(item.pinyin)} · ${escapeHtml(formatLevel(item.level))}</span>
+                <p>${escapeHtml(getMeaning(item))}</p>
+            </article>
+        `).join('')
+        : '<div class="review-empty video-empty"><strong>Chưa thấy từ HSK trong câu này</strong><span>Đổi cấp HSK hoặc chọn dòng phụ đề khác để dò thêm từ.</span></div>';
+}
+
+function getVideoVocabularyMatches(text) {
+    const normalized = String(text || '');
+    const seen = new Set();
+    return getLevelKeys('vocab')
+        .flatMap((level) => getData('vocab', level).map((item) => ({ ...item, level })))
+        .filter((item) => item.hanzi && normalized.includes(item.hanzi))
+        .filter((item) => {
+            if (seen.has(item.hanzi)) return false;
+            seen.add(item.hanzi);
+            return true;
+        })
+        .slice(0, 12);
+}
+
+function renderSubtitleList() {
+    if (!subtitleCues.length) {
+        els.subtitleList.innerHTML = `
+            <div class="review-empty">
+                <strong>Chưa có danh sách phụ đề</strong>
+                <span>Thêm phụ đề để xem từng câu, bấm vào câu để phát lại đúng đoạn.</span>
+            </div>
+        `;
+        return;
+    }
+
+    els.subtitleList.innerHTML = subtitleCues.map((cue, index) => `
+        <button class="subtitle-row${index === activeSubtitleIndex ? ' active' : ''}" type="button" data-subtitle-index="${index}">
+            <span>${escapeHtml(formatCueTime(cue.start))}</span>
+            <strong>${escapeHtml(cue.text || cue.rawText)}</strong>
+            <em>${escapeHtml(cue.translation || '')}</em>
+        </button>
+    `).join('');
+}
+
+function formatCueTime(value) {
+    const totalSeconds = Math.max(0, Math.floor(value || 0));
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 }
 
 function getExamScore() {

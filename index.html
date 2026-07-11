@@ -41,6 +41,10 @@
                     <span aria-hidden="true">▣</span>
                     Đề thi
                 </button>
+                <button class="side-link" id="navVideo" type="button">
+                    <span aria-hidden="true">▻</span>
+                    Video
+                </button>
                 <button class="side-link" id="navWriting" type="button">
                     <span aria-hidden="true">文</span>
                     Chữ Hán
@@ -224,6 +228,52 @@
                             <button class="ghost-light-action" id="testStudyLevel" type="button">Ôn cấp đang chọn</button>
                         </div>
                         <div class="test-list" id="testList"></div>
+                    </div>
+
+                    <div class="video-panel" id="videoPanel" hidden>
+                        <div class="video-toolbar">
+                            <div>
+                                <span class="review-tag">Video + phụ đề</span>
+                                <h4>Học tiếng Trung từ video của bạn</h4>
+                                <p>Tải video từ máy, thêm phụ đề SRT/VTT hoặc dán transcript có thời gian để luyện nghe theo từng câu.</p>
+                            </div>
+                        </div>
+                        <div class="video-learning-grid">
+                            <section class="video-player-panel">
+                                <video id="learningVideo" controls playsinline></video>
+                                <div class="subtitle-overlay" id="subtitleOverlay" aria-live="polite">Chưa có phụ đề.</div>
+                                <div class="video-file-controls">
+                                    <label class="file-picker">
+                                        <span>Chọn video</span>
+                                        <input id="videoFileInput" type="file" accept="video/*">
+                                    </label>
+                                    <label class="file-picker">
+                                        <span>Chọn phụ đề</span>
+                                        <input id="subtitleFileInput" type="file" accept=".srt,.vtt,text/vtt,text/plain">
+                                    </label>
+                                </div>
+                            </section>
+                            <aside class="subtitle-study-panel">
+                                <div class="subtitle-editor">
+                                    <label for="subtitleText">Phụ đề SRT/VTT hoặc text có mốc thời gian</label>
+                                    <textarea id="subtitleText" rows="8" placeholder="00:00:01,000 --> 00:00:04,000&#10;你好，我叫安。&#10;Xin chào, tôi tên là An."></textarea>
+                                    <button class="primary-action" id="loadSubtitleText" type="button">Tạo phụ đề học</button>
+                                </div>
+                                <div class="active-subtitle-card">
+                                    <span class="review-tag" id="activeSubtitleTime">00:00</span>
+                                    <strong id="activeSubtitleText">Chọn video và thêm phụ đề để bắt đầu.</strong>
+                                    <p id="activeSubtitleTranslation">Các câu phụ đề sẽ hiện theo thời gian video.</p>
+                                </div>
+                                <div class="video-vocab-card">
+                                    <div class="video-card-heading">
+                                        <h5>Từ HSK trong câu này</h5>
+                                        <span id="videoVocabCount">0 từ</span>
+                                    </div>
+                                    <div class="video-vocab-list" id="videoVocabList"></div>
+                                </div>
+                            </aside>
+                        </div>
+                        <div class="subtitle-list" id="subtitleList"></div>
                     </div>
 
                     <div class="ai-panel" id="aiPanel" hidden>
