@@ -242,6 +242,20 @@
                             <section class="video-player-panel">
                                 <video id="learningVideo" controls playsinline></video>
                                 <div class="subtitle-overlay" id="subtitleOverlay" aria-live="polite">Chưa có phụ đề.</div>
+                                <div class="video-playback-controls" aria-label="Điều khiển luyện nghe">
+                                    <button class="ghost-light-action" id="prevSubtitle" type="button">Câu trước</button>
+                                    <button class="primary-action" id="replaySubtitle" type="button">Nghe lại câu</button>
+                                    <button class="ghost-light-action" id="nextSubtitle" type="button">Câu tiếp</button>
+                                    <label class="speed-control">
+                                        <span>Tốc độ</span>
+                                        <select id="videoSpeed">
+                                            <option value="0.75">0.75x</option>
+                                            <option value="1" selected>1x</option>
+                                            <option value="1.25">1.25x</option>
+                                            <option value="1.5">1.5x</option>
+                                        </select>
+                                    </label>
+                                </div>
                                 <div class="video-file-controls">
                                     <label class="file-picker">
                                         <span>Chọn video</span>

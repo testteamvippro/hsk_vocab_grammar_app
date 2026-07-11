@@ -158,6 +158,10 @@ const els = {
     learningVideo: document.getElementById('learningVideo'),
     videoFileInput: document.getElementById('videoFileInput'),
     subtitleFileInput: document.getElementById('subtitleFileInput'),
+    prevSubtitle: document.getElementById('prevSubtitle'),
+    replaySubtitle: document.getElementById('replaySubtitle'),
+    nextSubtitle: document.getElementById('nextSubtitle'),
+    videoSpeed: document.getElementById('videoSpeed'),
     subtitleText: document.getElementById('subtitleText'),
     loadSubtitleText: document.getElementById('loadSubtitleText'),
     subtitleOverlay: document.getElementById('subtitleOverlay'),
@@ -361,18 +365,26 @@ els.testPanel.addEventListener('click', (event) => {
 
 els.videoFileInput.addEventListener('change', handleVideoFileChange);
 els.subtitleFileInput.addEventListener('change', handleSubtitleFileChange);
+els.prevSubtitle.addEventListener('click', () => seekRelativeSubtitle(-1));
+els.replaySubtitle.addEventListener('click', replayActiveSubtitle);
+els.nextSubtitle.addEventListener('click', () => seekRelativeSubtitle(1));
+els.videoSpeed.addEventListener('change', () => {
+    els.learningVideo.playbackRate = Number(els.videoSpeed.value) || 1;
+});
 els.loadSubtitleText.addEventListener('click', () => loadSubtitleText(els.subtitleText.value));
 els.learningVideo.addEventListener('timeupdate', syncSubtitleToVideo);
 els.learningVideo.addEventListener('seeked', syncSubtitleToVideo);
 els.subtitleList.addEventListener('click', (event) => {
     const cueButton = event.target.closest('[data-subtitle-index]');
     if (!cueButton) return;
-    const cue = subtitleCues[Number(cueButton.dataset.subtitleIndex)];
-    if (!cue) return;
-    els.learningVideo.currentTime = cue.start;
-    activeSubtitleIndex = -1;
-    syncSubtitleToVideo();
-    els.learningVideo.play().catch(() => {});
+    seekSubtitle(Number(cueButton.dataset.subtitleIndex), true);
+});
+els.videoVocabList.addEventListener('click', (event) => {
+    const learnedButton = event.target.closest('[data-video-vocab-key]');
+    if (!learnedButton) return;
+    setProgressValue(learnedButton.dataset.videoVocabKey, { learned: true });
+    renderActiveSubtitle();
+    renderMotivationStats();
 });
 
 els.aiQuickPrompts.addEventListener('click', (event) => {
@@ -1419,11 +1431,18 @@ function renderVideoPanel() {
     renderMotivationStats();
     renderSubtitleList();
     renderActiveSubtitle();
+    updateVideoControlState();
 }
 
 function handleVideoFileChange(event) {
     const file = event.target.files?.[0];
     if (!file) return;
+    if (!file.type.startsWith('video/')) {
+        els.resultMeta.textContent = 'File này không phải video. Hãy chọn file video như MP4, WebM hoặc MOV.';
+        event.target.value = '';
+        return;
+    }
+
     if (videoObjectUrl) URL.revokeObjectURL(videoObjectUrl);
     videoObjectUrl = URL.createObjectURL(file);
     els.learningVideo.src = videoObjectUrl;
@@ -1434,6 +1453,12 @@ function handleVideoFileChange(event) {
 function handleSubtitleFileChange(event) {
     const file = event.target.files?.[0];
     if (!file) return;
+    if (!/\.(srt|vtt|txt)$/i.test(file.name)) {
+        els.resultMeta.textContent = 'File phụ đề nên là .srt, .vtt hoặc .txt có mốc thời gian.';
+        event.target.value = '';
+        return;
+    }
+
     const reader = new FileReader();
     reader.addEventListener('load', () => {
         const text = String(reader.result || '');
@@ -1457,7 +1482,7 @@ function parseSubtitleCues(rawText) {
     const normalized = String(rawText || '')
         .replace(/\r/g, '')
         .replace(/^\uFEFF/, '')
-        .replace(/^WEBVTT.*\n/i, '')
+        .replace(/^WEBVTT[^\n]*\n/i, '')
         .trim();
     if (!normalized) return [];
 
@@ -1469,16 +1494,25 @@ function parseSubtitleCues(rawText) {
 }
 
 function parseSubtitleBlock(block) {
-    const lines = block.split('\n').map((line) => line.trim()).filter(Boolean);
+    const lines = block
+        .split('\n')
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .filter((line) => !/^(NOTE|STYLE|REGION)(\s|$)/i.test(line));
     const timeIndex = lines.findIndex((line) => line.includes('-->'));
     if (timeIndex === -1) return null;
 
     const [startRaw, endRaw] = lines[timeIndex].split('-->').map((part) => part.trim().split(/\s+/)[0]);
     const start = parseSubtitleTime(startRaw);
     const end = parseSubtitleTime(endRaw);
-    if (!Number.isFinite(start) || !Number.isFinite(end)) return null;
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return null;
 
-    const textLines = lines.slice(timeIndex + 1);
+    const textLines = lines
+        .slice(timeIndex + 1)
+        .map(cleanSubtitleText)
+        .filter(Boolean);
+    if (!textLines.length) return null;
+
     const chineseLines = textLines.filter((line) => /[\u3400-\u9fff]/.test(line));
     const translationLines = textLines.filter((line) => !/[\u3400-\u9fff]/.test(line));
 
@@ -1489,6 +1523,14 @@ function parseSubtitleBlock(block) {
         translation: translationLines.join(' ') || textLines.slice(1).join(' '),
         rawText: textLines.join(' '),
     };
+}
+
+function cleanSubtitleText(value) {
+    return String(value || '')
+        .replace(/<[^>]+>/g, '')
+        .replace(/\{\\[a-z0-9]+[^}]*\}/gi, '')
+        .replace(/\s+/g, ' ')
+        .trim();
 }
 
 function parseSubtitleTime(value) {
@@ -1506,13 +1548,13 @@ function syncSubtitleToVideo() {
         return;
     }
 
-    const time = els.learningVideo.currentTime || 0;
-    const nextIndex = subtitleCues.findIndex((cue) => time >= cue.start && time <= cue.end);
+    const nextIndex = getCueIndexAtTime(els.learningVideo.currentTime || 0);
     if (nextIndex === activeSubtitleIndex) return;
 
     activeSubtitleIndex = nextIndex;
     renderActiveSubtitle();
     renderSubtitleList();
+    updateVideoControlState();
 }
 
 function renderActiveSubtitle() {
@@ -1522,19 +1564,26 @@ function renderActiveSubtitle() {
     els.activeSubtitleText.textContent = cue ? cue.text : 'Chọn video và thêm phụ đề để bắt đầu.';
     els.activeSubtitleTranslation.textContent = cue?.translation || (cue ? 'Không có dòng dịch riêng trong phụ đề này.' : 'Các câu phụ đề sẽ hiện theo thời gian video.');
     renderVideoVocabulary(cue);
+    updateVideoControlState();
 }
 
 function renderVideoVocabulary(cue) {
     const matches = cue ? getVideoVocabularyMatches(cue.rawText || cue.text) : [];
     els.videoVocabCount.textContent = `${matches.length} từ`;
     els.videoVocabList.innerHTML = matches.length
-        ? matches.map((item) => `
+        ? matches.map((item) => {
+            const progress = progressState[item.key] || {};
+            return `
             <article class="video-vocab-item">
                 <strong>${escapeHtml(item.hanzi)}</strong>
                 <span>${escapeHtml(item.pinyin)} · ${escapeHtml(formatLevel(item.level))}</span>
                 <p>${escapeHtml(getMeaning(item))}</p>
+                <button class="mark-word-action" type="button" data-video-vocab-key="${escapeHtml(item.key)}" ${progress.learned ? 'disabled' : ''}>
+                    ${progress.learned ? 'Đã học' : 'Đánh dấu đã học'}
+                </button>
             </article>
-        `).join('')
+        `;
+        }).join('')
         : '<div class="review-empty video-empty"><strong>Chưa thấy từ HSK trong câu này</strong><span>Đổi cấp HSK hoặc chọn dòng phụ đề khác để dò thêm từ.</span></div>';
 }
 
@@ -1542,7 +1591,11 @@ function getVideoVocabularyMatches(text) {
     const normalized = String(text || '');
     const seen = new Set();
     return getLevelKeys('vocab')
-        .flatMap((level) => getData('vocab', level).map((item) => ({ ...item, level })))
+        .flatMap((level) => getData('vocab', level).map((item) => ({
+            ...item,
+            level,
+            key: getItemKey('vocab', level, item),
+        })))
         .filter((item) => item.hanzi && normalized.includes(item.hanzi))
         .filter((item) => {
             if (seen.has(item.hanzi)) return false;
@@ -1572,11 +1625,61 @@ function renderSubtitleList() {
     `).join('');
 }
 
+function seekRelativeSubtitle(direction) {
+    if (!subtitleCues.length) return;
+    const currentIndex = activeSubtitleIndex >= 0
+        ? activeSubtitleIndex
+        : getNearestCueIndex(els.learningVideo.currentTime || 0);
+    const nextIndex = Math.min(Math.max(currentIndex + direction, 0), subtitleCues.length - 1);
+    seekSubtitle(nextIndex, true);
+}
+
+function replayActiveSubtitle() {
+    if (!subtitleCues.length) return;
+    const index = activeSubtitleIndex >= 0
+        ? activeSubtitleIndex
+        : getNearestCueIndex(els.learningVideo.currentTime || 0);
+    seekSubtitle(index, true);
+}
+
+function seekSubtitle(index, shouldPlay = false) {
+    const cue = subtitleCues[index];
+    if (!cue) return;
+    activeSubtitleIndex = index;
+    els.learningVideo.currentTime = Math.max(0, cue.start + 0.01);
+    renderActiveSubtitle();
+    renderSubtitleList();
+    if (shouldPlay) els.learningVideo.play().catch(() => {});
+}
+
+function getCueIndexAtTime(time) {
+    return subtitleCues.findIndex((cue) => time >= cue.start && time < cue.end);
+}
+
+function getNearestCueIndex(time) {
+    const nextIndex = subtitleCues.findIndex((cue) => cue.start > time);
+    if (nextIndex === -1) return subtitleCues.length - 1;
+    if (nextIndex === 0) return 0;
+    const previous = subtitleCues[nextIndex - 1];
+    const next = subtitleCues[nextIndex];
+    return Math.abs(time - previous.end) <= Math.abs(next.start - time) ? nextIndex - 1 : nextIndex;
+}
+
+function updateVideoControlState() {
+    const hasCues = subtitleCues.length > 0;
+    els.prevSubtitle.disabled = !hasCues || activeSubtitleIndex <= 0;
+    els.replaySubtitle.disabled = !hasCues;
+    els.nextSubtitle.disabled = !hasCues || activeSubtitleIndex >= subtitleCues.length - 1;
+}
+
 function formatCueTime(value) {
     const totalSeconds = Math.max(0, Math.floor(value || 0));
-    const minutes = Math.floor(totalSeconds / 60);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
     const seconds = totalSeconds % 60;
-    return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    return hours
+        ? `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+        : `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 }
 
 function getExamScore() {

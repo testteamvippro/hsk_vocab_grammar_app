@@ -1167,6 +1167,45 @@ tbody tr:hover {
     gap: 10px;
 }
 
+.video-playback-controls {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(112px, 0.55fr);
+    gap: 8px;
+    align-items: stretch;
+}
+
+.video-playback-controls .primary-action,
+.video-playback-controls .ghost-light-action {
+    min-height: 40px;
+    padding: 8px 10px;
+}
+
+.speed-control {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 4px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: #fff;
+    padding: 6px 8px;
+}
+
+.speed-control span {
+    color: var(--muted);
+    font-size: 0.68rem;
+    font-weight: 900;
+    text-transform: uppercase;
+}
+
+.speed-control select {
+    width: 100%;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: var(--blue-dark);
+    font-weight: 900;
+}
+
 .file-picker {
     display: grid;
     gap: 7px;
@@ -1284,6 +1323,23 @@ tbody tr:hover {
 .video-vocab-item p {
     color: var(--muted);
     font-size: 0.88rem;
+}
+
+.mark-word-action {
+    justify-self: start;
+    min-height: 32px;
+    border: 1px solid #bdebd8;
+    border-radius: var(--radius);
+    background: #effcf6;
+    color: #08784d;
+    font-size: 0.78rem;
+    font-weight: 900;
+    padding: 6px 9px;
+}
+
+.mark-word-action:hover:not(:disabled) {
+    border-color: #7ad6ad;
+    background: #dcf8eb;
 }
 
 .video-empty {
@@ -2114,6 +2170,7 @@ tbody tr:hover {
     }
 
     .video-file-controls,
+    .video-playback-controls,
     .subtitle-row {
         grid-template-columns: 1fr;
     }
