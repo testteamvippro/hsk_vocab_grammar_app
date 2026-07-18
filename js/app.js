@@ -110,6 +110,10 @@ let aiMessages = [];
 let videoObjectUrl = '';
 let subtitleCues = [];
 let activeSubtitleIndex = -1;
+let isPinyinHidden = false;
+let isShuffled = false;
+let unshuffledData = [];
+let toastTimer;
 
 const els = {
     navStudy: document.getElementById('navStudy'),
@@ -203,6 +207,12 @@ const els = {
     studyNotePanel: document.getElementById('studyNotePanel'),
     cardLearned: document.getElementById('cardLearned'),
     cardNote: document.getElementById('cardNote'),
+    speakCard: document.getElementById('speakCard'),
+    togglePinyin: document.getElementById('togglePinyin'),
+    shuffleCards: document.getElementById('shuffleCards'),
+    recallPanel: document.getElementById('recallPanel'),
+    cardPrompt: document.getElementById('cardPrompt'),
+    appToast: document.getElementById('appToast'),
 };
 
 const tableConfig = {
@@ -281,6 +291,15 @@ els.tableViewBtn.addEventListener('click', () => setView('table'));
 els.flipCard.addEventListener('click', flipCurrentCard);
 els.prevCard.addEventListener('click', () => moveCard(-1));
 els.nextCard.addEventListener('click', () => moveCard(1));
+els.studyCard.addEventListener('click', flipCurrentCard);
+els.speakCard.addEventListener('click', speakCurrentCard);
+els.togglePinyin.addEventListener('click', togglePinyinVisibility);
+els.shuffleCards.addEventListener('click', toggleShuffle);
+els.recallPanel.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-recall]');
+    if (button) rateCurrentCard(button.dataset.recall);
+});
+document.addEventListener('keydown', handleStudyKeyboard);
 els.cardLearned.addEventListener('change', () => {
     const item = currentFiltered[currentCardIndex];
     if (!item) return;
@@ -646,6 +665,10 @@ function renderLevelChips() {
 
 function loadLevel() {
     currentData = getData(currentMode, currentLevel);
+    isShuffled = false;
+    unshuffledData = [];
+    els.shuffleCards.classList.remove('active');
+    els.shuffleCards.setAttribute('aria-pressed', 'false');
     currentCardIndex = 0;
     isCardFlipped = false;
     els.searchInput.value = '';
@@ -715,6 +738,10 @@ function renderCard() {
     const item = currentFiltered[currentCardIndex];
     const hasCards = Boolean(item);
     els.studyCard.classList.toggle('is-flipped', isCardFlipped);
+    els.studyCard.classList.toggle('hide-pinyin', isPinyinHidden);
+    els.flipCard.textContent = isCardFlipped ? 'Ẩn đáp án' : 'Hiện đáp án';
+    els.recallPanel.hidden = !hasCards || !isCardFlipped;
+    els.cardPrompt.textContent = isCardFlipped ? 'Đáp án' : 'Bạn nhớ nghĩa của mục này không?';
     els.prevCard.disabled = !hasCards || currentFiltered.length < 2;
     els.nextCard.disabled = !hasCards || currentFiltered.length < 2;
     els.flipCard.disabled = !hasCards;
@@ -757,6 +784,123 @@ function renderCard() {
 function flipCurrentCard() {
     isCardFlipped = !isCardFlipped;
     renderCard();
+}
+
+function speakCurrentCard() {
+    const item = currentFiltered[currentCardIndex];
+    if (!item || !('speechSynthesis' in window)) {
+        showToast('Trình duyệt này chưa hỗ trợ đọc thành tiếng.');
+        return;
+    }
+
+    window.speechSynthesis.cancel();
+    const text = currentMode === 'vocab' ? item.hanzi : (item.ex_cn || item.structure);
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'zh-CN';
+    utterance.rate = 0.82;
+    const chineseVoice = window.speechSynthesis.getVoices().find((voice) => voice.lang.toLowerCase().startsWith('zh'));
+    if (chineseVoice) utterance.voice = chineseVoice;
+    window.speechSynthesis.speak(utterance);
+    els.speakCard.classList.add('is-speaking');
+    utterance.onend = () => els.speakCard.classList.remove('is-speaking');
+}
+
+function togglePinyinVisibility() {
+    isPinyinHidden = !isPinyinHidden;
+    els.togglePinyin.classList.toggle('active', isPinyinHidden);
+    els.togglePinyin.setAttribute('aria-pressed', String(isPinyinHidden));
+    els.togglePinyin.lastChild.textContent = isPinyinHidden ? ' Hiện pinyin' : ' Ẩn pinyin';
+    renderCard();
+}
+
+function toggleShuffle() {
+    if (currentFiltered.length < 2) return;
+    isShuffled = !isShuffled;
+
+    if (isShuffled) {
+        unshuffledData = [...currentFiltered];
+        currentFiltered = shuffleArray([...currentFiltered]);
+        showToast('Đã trộn thứ tự thẻ.');
+    } else {
+        currentFiltered = unshuffledData.length ? [...unshuffledData] : [...currentData];
+        unshuffledData = [];
+        showToast('Đã trở về thứ tự ban đầu.');
+    }
+
+    currentCardIndex = 0;
+    isCardFlipped = false;
+    els.shuffleCards.classList.toggle('active', isShuffled);
+    els.shuffleCards.setAttribute('aria-pressed', String(isShuffled));
+    renderCard();
+}
+
+function rateCurrentCard(rating) {
+    const item = currentFiltered[currentCardIndex];
+    if (!item) return;
+
+    const schedules = {
+        again: { days: 0, stage: 0, xp: 1, label: 'Sẽ gặp lại trong phiên này' },
+        hard: { days: 1, stage: 1, xp: 2, label: 'Hẹn ôn lại vào ngày mai' },
+        good: { days: 3, stage: 2, xp: 4, label: 'Hẹn ôn lại sau 3 ngày' },
+        easy: { days: 7, stage: 3, xp: 6, label: 'Hẹn ôn lại sau 7 ngày' },
+    };
+    const schedule = schedules[rating] || schedules.good;
+    const key = getItemKey(currentMode, currentLevel, item);
+    const previous = getProgress(key);
+    const learned = rating !== 'again' || previous.learned;
+    const awardedXp = previous.learned ? schedule.xp : (learned ? 5 : 0);
+
+    setProgressValue(key, {
+        learned,
+        reviewStage: schedule.stage,
+        dueAt: schedule.days === 0 ? new Date().toISOString() : getFutureDate(schedule.days),
+        rating,
+    });
+    if (schedule.xp > 0 && previous.learned) {
+        statsState.xp += schedule.xp;
+        saveStatsState();
+    }
+
+    showToast(`${schedule.label}${awardedXp ? ` · +${awardedXp} XP` : ''}`);
+    renderTable(currentFiltered);
+    updateMeta(els.searchInput.value.toLowerCase().trim());
+    window.setTimeout(() => moveCard(1), 180);
+}
+
+function handleStudyKeyboard(event) {
+    if (currentRoute !== 'study' || currentView !== 'cards') return;
+    const tag = event.target.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
+    if (event.code === 'Space') {
+        event.preventDefault();
+        flipCurrentCard();
+    } else if (event.key === 'ArrowLeft') {
+        moveCard(-1);
+    } else if (event.key === 'ArrowRight') {
+        moveCard(1);
+    } else if (event.key.toLowerCase() === 's') {
+        speakCurrentCard();
+    } else if (event.key.toLowerCase() === 'p') {
+        togglePinyinVisibility();
+    } else if (isCardFlipped && ['1', '2', '3', '4'].includes(event.key)) {
+        rateCurrentCard(['again', 'hard', 'good', 'easy'][Number(event.key) - 1]);
+    }
+}
+
+function shuffleArray(items) {
+    for (let index = items.length - 1; index > 0; index -= 1) {
+        const randomIndex = Math.floor(Math.random() * (index + 1));
+        [items[index], items[randomIndex]] = [items[randomIndex], items[index]];
+    }
+    return items;
+}
+
+function showToast(message) {
+    clearTimeout(toastTimer);
+    els.appToast.textContent = message;
+    els.appToast.classList.add('show');
+    toastTimer = window.setTimeout(() => els.appToast.classList.remove('show'), 2200);
 }
 
 function moveCard(step) {

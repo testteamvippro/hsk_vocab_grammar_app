@@ -7,7 +7,7 @@
     <meta name="description" content="Ứng dụng học từ vựng và ngữ pháp HSK bằng flashcard, pinyin và nghĩa tiếng Việt">
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%E4%B9%A6%3C/text%3E%3C/svg%3E">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="./css/style.css?v=20260704-writing">
+    <link rel="stylesheet" href="./css/style.css?v=20260718-modern-study">
 </head>
 <body>
     <div class="app-shell">
@@ -65,8 +65,8 @@
         <main class="workspace">
             <header class="topbar">
                 <div>
-                    <p class="eyebrow">Web học tiếng Trung cho người Việt</p>
-                    <h1>Lộ trình từ vựng & ngữ pháp HSK</h1>
+                    <p class="eyebrow">你好, chào mừng bạn trở lại</p>
+                    <h1>Hôm nay mình học gì?</h1>
                 </div>
                 <div class="topbar-actions">
                     <div class="search-box">
@@ -89,7 +89,7 @@
                     <div class="hero-actions">
                         <button class="primary-action" id="btnFlashcards" type="button">
                             <span aria-hidden="true">▶</span>
-                            Học flashcard
+                            Tiếp tục học
                         </button>
                         <button class="ghost-action" id="btnListView" type="button">
                             <span aria-hidden="true">☰</span>
@@ -101,7 +101,7 @@
                 <div class="preview-stack" aria-hidden="true">
                     <div class="preview-card back"></div>
                     <div class="preview-card">
-                        <span>今日词卡</span>
+                            <span>THẺ HÔM NAY</span>
                         <strong id="previewHanzi">你好</strong>
                         <p id="previewPinyin">nǐ hǎo</p>
                     </div>
@@ -166,8 +166,24 @@
                     <p class="result-meta" id="resultMeta" aria-live="polite">Sẵn sàng học.</p>
 
                     <div class="deck-panel" id="deckPanel">
-                        <article class="study-card" id="studyCard">
+                        <div class="session-toolbar" aria-label="Công cụ phiên học">
+                            <div class="session-tools">
+                                <button class="tool-action" id="speakCard" type="button" title="Nghe phát âm (S)">
+                                    <span aria-hidden="true">◖))</span> Nghe
+                                </button>
+                                <button class="tool-action" id="togglePinyin" type="button" aria-pressed="false" title="Ẩn hoặc hiện pinyin (P)">
+                                    <span aria-hidden="true">拼</span> Ẩn pinyin
+                                </button>
+                                <button class="tool-action" id="shuffleCards" type="button" aria-pressed="false" title="Trộn thứ tự thẻ">
+                                    <span aria-hidden="true">⇄</span> Trộn thẻ
+                                </button>
+                            </div>
+                            <span class="shortcut-hint">Space lật · ← → chuyển · 1–4 đánh giá</span>
+                        </div>
+
+                        <article class="study-card" id="studyCard" tabindex="0" role="button" aria-label="Nhấn để lật thẻ">
                             <span class="card-count" id="cardCounter">1 / 1</span>
+                            <span class="card-prompt" id="cardPrompt">Bạn nhớ nghĩa của từ này không?</span>
                             <div class="card-main">
                                 <strong id="cardHanzi">你好</strong>
                                 <span id="cardPinyin">nǐ hǎo</span>
@@ -180,8 +196,18 @@
 
                         <div class="deck-actions">
                             <button class="icon-action" id="prevCard" type="button" aria-label="Thẻ trước">‹</button>
-                            <button class="flip-action" id="flipCard" type="button">Lật thẻ</button>
+                            <button class="flip-action" id="flipCard" type="button">Hiện đáp án</button>
                             <button class="icon-action" id="nextCard" type="button" aria-label="Thẻ sau">›</button>
+                        </div>
+
+                        <div class="recall-panel" id="recallPanel" hidden aria-label="Đánh giá mức độ ghi nhớ">
+                            <p>Bạn nhớ từ này thế nào?</p>
+                            <div class="recall-actions">
+                                <button class="recall-btn again" type="button" data-recall="again"><kbd>1</kbd><strong>Chưa nhớ</strong><span>Ôn lại ngay</span></button>
+                                <button class="recall-btn hard" type="button" data-recall="hard"><kbd>2</kbd><strong>Hơi khó</strong><span>Ngày mai</span></button>
+                                <button class="recall-btn good" type="button" data-recall="good"><kbd>3</kbd><strong>Đã nhớ</strong><span>3 ngày</span></button>
+                                <button class="recall-btn easy" type="button" data-recall="easy"><kbd>4</kbd><strong>Rất dễ</strong><span>7 ngày</span></button>
+                            </div>
                         </div>
 
                         <div class="study-note-panel" id="studyNotePanel">
@@ -339,6 +365,8 @@
         </main>
     </div>
 
-    <script type="module" src="./js/app.js?v=20260704-writing"></script>
+    <div class="toast" id="appToast" role="status" aria-live="polite"></div>
+
+    <script type="module" src="./js/app.js?v=20260718-modern-study"></script>
 </body>
 </html>
