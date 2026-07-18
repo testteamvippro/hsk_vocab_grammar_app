@@ -19,6 +19,7 @@ const standards = {
 const progressStorageKey = 'hskMasteryProgress.v1';
 const statsStorageKey = 'hskMasteryStats.v1';
 const readingStorageKey = 'hskMasteryReadings.v1';
+const writingDraftStorageKey = 'hskMasteryWritingDrafts.v1';
 const dailyGoalTarget = 20;
 const reviewIntervals = [1, 3, 7, 14, 30];
 const strokeBasics = [
@@ -49,6 +50,30 @@ const toneGuide = [
 ];
 const pinyinInitials = ['b', 'p', 'm', 'f', 'd', 't', 'n', 'l', 'g', 'k', 'h', 'j', 'q', 'x', 'zh', 'ch', 'sh', 'r', 'z', 'c', 's', 'y', 'w'];
 const pinyinFinals = ['a', 'o', 'e', 'i', 'u', 'ü', 'ai', 'ei', 'ao', 'ou', 'an', 'en', 'ang', 'eng', 'ong', 'ia', 'ie', 'iao', 'iu', 'ian', 'in', 'iang', 'ing', 'iong', 'ua', 'uo', 'uai', 'ui', 'uan', 'un', 'uang', 'ueng', 'üe', 'üan', 'ün'];
+const commonPinyinCandidates = {
+    wo: '我', ni: '你', ta: '他', women: '我们', nimen: '你们', tamen: '他们',
+    de: '的', le: '了', ma: '吗', ne: '呢', ba: '吧', shi: '是', bu: '不', mei: '没', you: '有',
+    zai: '在', he: '和', ye: '也', dou: '都', hen: '很', tai: '太', zhen: '真',
+    xiang: '想', yao: '要', hui: '会', neng: '能', keyi: '可以', yinggai: '应该',
+    shenme: '什么', zenme: '怎么', weishenme: '为什么', nar: '哪儿', nali: '哪里',
+    zhe: '这', na: '那', zheli: '这里', nali: '那里', yige: '一个',
+    hao: '好', da: '大', xiao: '小', duo: '多', shao: '少', kuai: '快', man: '慢',
+    ren: '人', pengyou: '朋友', laoshi: '老师', xuesheng: '学生', tongxue: '同学',
+    baba: '爸爸', mama: '妈妈', gege: '哥哥', jiejie: '姐姐', didi: '弟弟', meimei: '妹妹', jiaren: '家人',
+    zhongguo: '中国', zhongwen: '中文', hanyu: '汉语', yingyu: '英语',
+    xue: '学', xuexi: '学习', kan: '看', ting: '听', shuo: '说', du: '读', xie: '写',
+    chi: '吃', he: '和', mai: '买', mai4: '卖', qu: '去', lai: '来', hui2: '回', zuo: '做',
+    gongzuo: '工作', gongsi: '公司', xuexiao: '学校', jia: '家', yiyuan: '医院', shangdian: '商店',
+    jintian: '今天', mingtian: '明天', zuotian: '昨天', xianzai: '现在', shijian: '时间',
+    zaoshang: '早上', zhongwu: '中午', wanshang: '晚上', tianqi: '天气',
+    shouji: '手机', diannao: '电脑', shu: '书', qian: '钱', shuǐ: '水', fan: '饭',
+    yinwei: '因为', suoyi: '所以', danshi: '但是', ranhou: '然后', ruguo: '如果',
+    nihao: '你好', xiexie: '谢谢', zaijian: '再见', duibuqi: '对不起', meiguanxi: '没关系',
+    wojiao: '我叫', woshi: '我是', woxiang: '我想', woxihuan: '我喜欢',
+    xuezhongwen: '学中文', xuehanyu: '学汉语', shuozhongwen: '说中文',
+    chifan: '吃饭', heshui: '喝水', huijia: '回家', quxuexiao: '去学校', qugongsi: '去公司',
+    anna: '安娜', damei: '大美', xiaoming: '小明', xiaolin: '小林',
+};
 const kangxiRadicals = Array.from({ length: 214 }, (_, index) => ({
     number: index + 1,
     symbol: String.fromCodePoint(0x2f00 + index),
@@ -121,6 +146,10 @@ let readingCurrentPage = 1;
 let activeReading = null;
 let activeReadingAnswers = {};
 const readingsPerPage = 12;
+let writingDrafts = loadWritingDrafts();
+let activeWritingDraftId = null;
+let pinyinDictionaryCache = null;
+let currentPinyinCandidates = [];
 
 const els = {
     navStudy: document.getElementById('navStudy'),
@@ -371,6 +400,10 @@ els.readerToggleTranslation.addEventListener('click', toggleReaderTranslation);
 els.readerToggleVocab.addEventListener('click', toggleReaderVocab);
 els.readerQuestions.addEventListener('click', handleReadingAnswer);
 els.readerComplete.addEventListener('click', completeActiveReading);
+els.writingContent.addEventListener('input', handleWritingWorkspaceInput);
+els.writingContent.addEventListener('click', handleWritingWorkspaceClick);
+els.writingContent.addEventListener('change', handleWritingWorkspaceChange);
+els.writingContent.addEventListener('keydown', handleWritingWorkspaceKeydown);
 els.cardLearned.addEventListener('change', () => {
     const item = currentFiltered[currentCardIndex];
     if (!item) return;
@@ -2194,19 +2227,434 @@ function getExamScore() {
     }, 0);
 }
 
+function buildWritingWorkspace() {
+    const activeDraft = writingDrafts.find((draft) => draft.id === activeWritingDraftId) || null;
+    const draftText = activeDraft?.text || '';
+    const hanziCount = (draftText.match(/[\u3400-\u9fff]/g) || []).length;
+    return `
+        <section class="writing-section composition-workspace">
+            <div class="writing-section-title composition-heading">
+                <div>
+                    <span class="review-tag">Soạn & lưu</span>
+                    <h4>Viết đoạn văn tiếng Trung</h4>
+                    <p>Gõ pinyin có dấu cách, chọn chữ gợi ý hoặc đổi cả câu. Bạn cũng có thể nhập chữ Hán trực tiếp.</p>
+                </div>
+                <span class="local-only-badge">⌂ Chỉ lưu trên thiết bị</span>
+            </div>
+
+            <div class="composition-layout">
+                <div class="composition-editor-panel">
+                    <div class="composition-meta-fields">
+                        <label>
+                            <span>Tiêu đề</span>
+                            <input id="compositionTitle" type="text" maxlength="80" value="${escapeHtml(activeDraft?.title || '')}" placeholder="Ví dụ: 我的周末">
+                        </label>
+                        <label>
+                            <span>Trình độ</span>
+                            <select id="compositionLevel">
+                                ${Array.from({ length: 9 }, (_, index) => `<option value="${index + 1}" ${String(index + 1) === String(activeDraft?.level || '1') ? 'selected' : ''}>HSK ${index + 1}</option>`).join('')}
+                            </select>
+                        </label>
+                    </div>
+
+                    <div class="pinyin-composer">
+                        <label for="compositionPinyin">Nhập pinyin</label>
+                        <div class="pinyin-input-row">
+                            <input id="compositionPinyin" type="text" autocomplete="off" spellcheck="false" placeholder="wo xiang xue zhong wen">
+                            <button type="button" data-writing-action="convert">Đổi sang chữ Hán</button>
+                        </div>
+                        <div class="pinyin-candidates" id="pinyinCandidates">
+                            <span>Nhập pinyin để xem chữ gợi ý.</span>
+                        </div>
+                    </div>
+
+                    <label class="composition-editor-label" for="compositionEditor">
+                        <span>Đoạn văn</span>
+                        <textarea id="compositionEditor" rows="10" maxlength="5000" lang="zh-CN" spellcheck="false" placeholder="在这里写中文，或从上面的拼音输入框添加汉字……">${escapeHtml(draftText)}</textarea>
+                    </label>
+                    <div class="composition-footer">
+                        <span id="compositionCount">${hanziCount} chữ Hán · ${draftText.length} ký tự</span>
+                        <div>
+                            <button class="ghost-light-action" type="button" data-writing-action="new">Bài mới</button>
+                            <button class="primary-action composition-save" type="button" data-writing-action="save">Lưu bản nháp</button>
+                        </div>
+                    </div>
+                </div>
+
+                <aside class="draft-sidebar">
+                    <div class="draft-sidebar-title">
+                        <div><span class="eyebrow">BẢN NHÁP</span><h5>Đã lưu trên máy</h5></div>
+                        <strong id="draftCount">${writingDrafts.length}</strong>
+                    </div>
+                    <div class="draft-list" id="writingDraftList">${buildWritingDraftList()}</div>
+                </aside>
+            </div>
+        </section>
+    `;
+}
+
+function buildWritingDraftList() {
+    if (writingDrafts.length === 0) {
+        return `<div class="draft-empty"><strong>Chưa có bản nháp</strong><span>Viết đoạn đầu tiên rồi bấm “Lưu bản nháp”.</span></div>`;
+    }
+
+    return writingDrafts.map((draft) => {
+        const preview = draft.text.replace(/\s+/g, ' ').trim().slice(0, 48) || 'Bản nháp trống';
+        return `
+            <article class="draft-item${draft.id === activeWritingDraftId ? ' active' : ''}">
+                <button type="button" data-writing-action="open" data-draft-id="${escapeHtml(draft.id)}">
+                    <span>HSK ${escapeHtml(draft.level || '1')} · ${escapeHtml(formatDraftDate(draft.updatedAt))}</span>
+                    <strong>${escapeHtml(draft.title || 'Chưa đặt tên')}</strong>
+                    <p>${escapeHtml(preview)}</p>
+                </button>
+                <button class="draft-delete" type="button" data-writing-action="delete" data-draft-id="${escapeHtml(draft.id)}" aria-label="Xóa ${escapeHtml(draft.title || 'bản nháp')}">×</button>
+            </article>
+        `;
+    }).join('');
+}
+
+function handleWritingWorkspaceInput(event) {
+    if (event.target.id === 'compositionPinyin') {
+        renderPinyinCandidates(event.target.value);
+    }
+    if (event.target.id === 'compositionEditor') {
+        updateCompositionCount();
+    }
+}
+
+function handleWritingWorkspaceChange(event) {
+    if (event.target.id === 'compositionLevel') updateCompositionCount();
+}
+
+function handleWritingWorkspaceKeydown(event) {
+    if (event.target.id !== 'compositionPinyin' || event.key !== 'Enter') return;
+    event.preventDefault();
+    convertPinyinComposerText();
+}
+
+function handleWritingWorkspaceClick(event) {
+    const actionTarget = event.target.closest('[data-writing-action]');
+    if (!actionTarget) return;
+    const action = actionTarget.dataset.writingAction;
+
+    if (action === 'convert') convertPinyinComposerText();
+    if (action === 'candidate') insertPinyinCandidate(Number(actionTarget.dataset.candidateIndex));
+    if (action === 'save') saveCurrentWritingDraft();
+    if (action === 'new') resetWritingWorkspace();
+    if (action === 'open') openWritingDraft(actionTarget.dataset.draftId);
+    if (action === 'delete') deleteWritingDraft(actionTarget.dataset.draftId);
+}
+
+function renderPinyinCandidates(rawValue) {
+    const container = document.getElementById('pinyinCandidates');
+    if (!container) return;
+    currentPinyinCandidates = findPinyinCandidates(rawValue);
+    if (!String(rawValue || '').trim()) {
+        container.innerHTML = '<span>Nhập pinyin để xem chữ gợi ý.</span>';
+        return;
+    }
+    if (currentPinyinCandidates.length === 0) {
+        container.innerHTML = '<span>Chưa tìm thấy từ phù hợp. Thử thêm dấu cách giữa các âm tiết.</span>';
+        return;
+    }
+    container.innerHTML = currentPinyinCandidates.map((candidate, index) => `
+        <button type="button" data-writing-action="candidate" data-candidate-index="${index}">
+            <strong>${escapeHtml(candidate.hanzi)}</strong>
+            <span>${escapeHtml(candidate.pinyin)}</span>
+            <em>${escapeHtml(candidate.meaning)}</em>
+        </button>
+    `).join('');
+}
+
+function findPinyinCandidates(rawValue) {
+    const rawParts = String(rawValue || '').trim().split(/\s+/).filter(Boolean);
+    if (rawParts.length === 0) return [];
+    const dictionary = getPinyinDictionary();
+    const joinedTail = rawParts.slice(-4).join('');
+    const exactKeys = Array.from({ length: Math.min(4, rawParts.length) }, (_, index) => {
+        return normalizePinyinValue(rawParts.slice(-(index + 1)).join(''));
+    }).reverse();
+    const found = [];
+    const seen = new Set();
+    exactKeys.forEach((key) => {
+        (dictionary.get(key) || []).forEach((candidate) => {
+            if (seen.has(candidate.hanzi)) return;
+            seen.add(candidate.hanzi);
+            found.push(candidate);
+        });
+    });
+    if (found.length < 10) {
+        const prefix = normalizePinyinValue(rawParts.at(-1) || joinedTail);
+        if (prefix.length >= 1) {
+            for (const [key, candidates] of dictionary) {
+                if (!key.startsWith(prefix)) continue;
+                candidates.forEach((candidate) => {
+                    if (seen.has(candidate.hanzi) || found.length >= 10) return;
+                    seen.add(candidate.hanzi);
+                    found.push(candidate);
+                });
+                if (found.length >= 10) break;
+            }
+        }
+    }
+    return found.slice(0, 10);
+}
+
+function getPinyinDictionary() {
+    if (pinyinDictionaryCache) return pinyinDictionaryCache;
+    const dictionary = new Map();
+    Object.entries(commonPinyinCandidates).forEach(([pinyin, hanzi]) => {
+        const key = normalizePinyinValue(pinyin);
+        const list = dictionary.get(key) || [];
+        if (!list.some((entry) => entry.hanzi === hanzi)) {
+            list.push({ hanzi, pinyin, meaning: 'Gợi ý phổ biến', level: 0, priority: 0 });
+        }
+        dictionary.set(key, list);
+    });
+    Object.entries(vocabData).forEach(([level, items]) => {
+        items.forEach((item) => {
+            const hanziForms = String(item.hanzi || '').split('｜').filter(Boolean);
+            const pinyinForms = String(item.pinyin || '').split('｜').filter(Boolean);
+            pinyinForms.forEach((pinyinForm, index) => {
+                const key = normalizePinyinValue(pinyinForm);
+                if (!key) return;
+                const candidate = {
+                    hanzi: hanziForms[index] || hanziForms[0] || item.hanzi,
+                    pinyin: pinyinForm,
+                    meaning: getMeaning(item),
+                    level: getLevelNumber(level),
+                    priority: 1,
+                };
+                const list = dictionary.get(key) || [];
+                if (!list.some((entry) => entry.hanzi === candidate.hanzi)) list.push(candidate);
+                list.sort((a, b) => a.priority - b.priority || a.level - b.level || a.hanzi.length - b.hanzi.length);
+                dictionary.set(key, list);
+            });
+        });
+    });
+    pinyinDictionaryCache = dictionary;
+    return dictionary;
+}
+
+function normalizePinyinValue(value) {
+    const toneMap = {
+        ā: 'a', á: 'a', ǎ: 'a', à: 'a',
+        ē: 'e', é: 'e', ě: 'e', è: 'e',
+        ī: 'i', í: 'i', ǐ: 'i', ì: 'i',
+        ō: 'o', ó: 'o', ǒ: 'o', ò: 'o',
+        ū: 'u', ú: 'u', ǔ: 'u', ù: 'u',
+        ǖ: 'v', ǘ: 'v', ǚ: 'v', ǜ: 'v', ü: 'v',
+        ń: 'n', ň: 'n', ǹ: 'n', ḿ: 'm',
+    };
+    return String(value || '')
+        .toLowerCase()
+        .replace(/u:/g, 'v')
+        .split('')
+        .map((char) => toneMap[char] || char)
+        .join('')
+        .replace(/[1-5]/g, '')
+        .replace(/[^a-zv]/g, '');
+}
+
+function convertPinyinComposerText() {
+    const input = document.getElementById('compositionPinyin');
+    const editor = document.getElementById('compositionEditor');
+    if (!input || !editor || !input.value.trim()) return;
+    const converted = convertPinyinToHanzi(input.value);
+    insertTextAtCursor(editor, converted);
+    input.value = '';
+    renderPinyinCandidates('');
+    updateCompositionCount();
+    editor.focus();
+    showToast(converted ? 'Đã chuyển pinyin sang chữ Hán.' : 'Chưa tìm thấy từ phù hợp.');
+}
+
+function convertPinyinToHanzi(value) {
+    const dictionary = getPinyinDictionary();
+    const punctuation = { ',': '，', '.': '。', '?': '？', '!': '！', ';': '；', ':': '：' };
+    const tokens = String(value || '').match(/[A-Za-züÜāáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜńňǹḿ:1-5]+|[,.!?;:，。！？；：\n]+/g) || [];
+    const output = [];
+    let index = 0;
+    while (index < tokens.length) {
+        const token = tokens[index];
+        if (!/[A-Za-züÜāáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜńňǹḿ]/.test(token)) {
+            output.push([...token].map((char) => punctuation[char] || char).join(''));
+            index += 1;
+            continue;
+        }
+
+        let match = null;
+        let matchedLength = 0;
+        for (let size = Math.min(5, tokens.length - index); size >= 1; size -= 1) {
+            const slice = tokens.slice(index, index + size);
+            if (slice.some((part) => !/[A-Za-züÜāáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜńňǹḿ]/.test(part))) continue;
+            const candidates = dictionary.get(normalizePinyinValue(slice.join('')));
+            if (candidates?.length) {
+                match = candidates[0];
+                matchedLength = size;
+                break;
+            }
+        }
+        if (match) {
+            output.push(match.hanzi);
+            index += matchedLength;
+        } else {
+            output.push(token);
+            index += 1;
+        }
+    }
+    return output.join('');
+}
+
+function insertPinyinCandidate(index) {
+    const candidate = currentPinyinCandidates[index];
+    const editor = document.getElementById('compositionEditor');
+    const input = document.getElementById('compositionPinyin');
+    if (!candidate || !editor || !input) return;
+    insertTextAtCursor(editor, candidate.hanzi);
+    input.value = '';
+    renderPinyinCandidates('');
+    updateCompositionCount();
+    editor.focus();
+}
+
+function insertTextAtCursor(textarea, text) {
+    const start = textarea.selectionStart ?? textarea.value.length;
+    const end = textarea.selectionEnd ?? start;
+    textarea.setRangeText(text, start, end, 'end');
+}
+
+function updateCompositionCount() {
+    const editor = document.getElementById('compositionEditor');
+    const counter = document.getElementById('compositionCount');
+    if (!editor || !counter) return;
+    const hanziCount = (editor.value.match(/[\u3400-\u9fff]/g) || []).length;
+    counter.textContent = `${hanziCount} chữ Hán · ${editor.value.length} ký tự`;
+}
+
+function saveCurrentWritingDraft() {
+    const titleInput = document.getElementById('compositionTitle');
+    const levelInput = document.getElementById('compositionLevel');
+    const editor = document.getElementById('compositionEditor');
+    if (!titleInput || !levelInput || !editor) return;
+    const text = editor.value.trim();
+    if (!text) {
+        showToast('Hãy viết một đoạn trước khi lưu.');
+        editor.focus();
+        return;
+    }
+    const id = activeWritingDraftId || `draft-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const previous = writingDrafts.find((draft) => draft.id === id);
+    const draft = {
+        id,
+        title: titleInput.value.trim() || text.replace(/\s+/g, ' ').slice(0, 18),
+        level: String(levelInput.value || 1),
+        text,
+        createdAt: previous?.createdAt || new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+    };
+    writingDrafts = [draft, ...writingDrafts.filter((item) => item.id !== id)].slice(0, 200);
+    activeWritingDraftId = id;
+    if (!saveWritingDrafts()) return;
+    titleInput.value = draft.title;
+    renderWritingDraftListOnly();
+    showToast('Đã lưu bản nháp trên thiết bị.');
+}
+
+function openWritingDraft(draftId) {
+    const draft = writingDrafts.find((item) => item.id === draftId);
+    if (!draft) return;
+    activeWritingDraftId = draft.id;
+    document.getElementById('compositionTitle').value = draft.title;
+    document.getElementById('compositionLevel').value = draft.level;
+    document.getElementById('compositionEditor').value = draft.text;
+    document.getElementById('compositionPinyin').value = '';
+    renderPinyinCandidates('');
+    updateCompositionCount();
+    renderWritingDraftListOnly();
+    document.getElementById('compositionEditor').focus();
+}
+
+function resetWritingWorkspace() {
+    activeWritingDraftId = null;
+    document.getElementById('compositionTitle').value = '';
+    document.getElementById('compositionLevel').value = '1';
+    document.getElementById('compositionEditor').value = '';
+    document.getElementById('compositionPinyin').value = '';
+    renderPinyinCandidates('');
+    updateCompositionCount();
+    renderWritingDraftListOnly();
+    document.getElementById('compositionTitle').focus();
+}
+
+function deleteWritingDraft(draftId) {
+    const draft = writingDrafts.find((item) => item.id === draftId);
+    if (!draft || !window.confirm(`Xóa bản nháp “${draft.title || 'Chưa đặt tên'}”?`)) return;
+    writingDrafts = writingDrafts.filter((item) => item.id !== draftId);
+    if (activeWritingDraftId === draftId) resetWritingWorkspace();
+    saveWritingDrafts();
+    renderWritingDraftListOnly();
+    showToast('Đã xóa bản nháp khỏi thiết bị.');
+}
+
+function renderWritingDraftListOnly() {
+    const list = document.getElementById('writingDraftList');
+    const count = document.getElementById('draftCount');
+    if (list) list.innerHTML = buildWritingDraftList();
+    if (count) count.textContent = writingDrafts.length;
+    els.wordCount.textContent = `${writingDrafts.length} bản nháp`;
+}
+
+function loadWritingDrafts() {
+    if (typeof localStorage === 'undefined') return [];
+    try {
+        const parsed = JSON.parse(localStorage.getItem(writingDraftStorageKey) || '[]');
+        if (!Array.isArray(parsed)) return [];
+        return parsed.slice(0, 200).map((draft) => ({
+            id: String(draft.id || ''),
+            title: String(draft.title || ''),
+            level: String(draft.level || '1'),
+            text: String(draft.text || ''),
+            createdAt: String(draft.createdAt || ''),
+            updatedAt: String(draft.updatedAt || ''),
+        })).filter((draft) => draft.id);
+    } catch {
+        return [];
+    }
+}
+
+function saveWritingDrafts() {
+    if (typeof localStorage === 'undefined') return false;
+    try {
+        localStorage.setItem(writingDraftStorageKey, JSON.stringify(writingDrafts));
+        return true;
+    } catch {
+        showToast('Không thể lưu: bộ nhớ trình duyệt đã đầy.');
+        return false;
+    }
+}
+
+function formatDraftDate(value) {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return 'Vừa tạo';
+    return new Intl.DateTimeFormat('vi-VN', { day: '2-digit', month: '2-digit', year: '2-digit' }).format(date);
+}
+
 function renderWritingPage() {
     const radicalCount = radicalGroups.reduce((sum, group) => sum + group.items.length, 0);
 
-    els.surfaceTitle.textContent = 'Nền tảng chữ Hán';
-    els.wordCount.textContent = `${radicalCount} bộ thủ`;
+    els.surfaceTitle.textContent = 'Viết tiếng Trung';
+    els.wordCount.textContent = `${writingDrafts.length} bản nháp`;
     els.activeLevelLabel.textContent = 'Writing';
-    els.courseTitle.textContent = 'Viết chữ Hán, đọc pinyin, nhớ bộ thủ';
-    els.levelHint.textContent = 'Nắm nét viết và bộ thủ giúp bạn đoán nghĩa, nhớ mặt chữ và tra từ nhanh hơn.';
-    els.resultMeta.textContent = 'Bắt đầu từ nét cơ bản, sau đó luyện thanh điệu và nhận diện bộ thủ trong từ HSK.';
+    els.courseTitle.textContent = 'Soạn đoạn văn tiếng Trung';
+    els.levelHint.textContent = 'Gõ pinyin để đổi sang chữ Hán, hoặc nhập tiếng Trung trực tiếp rồi lưu bản nháp trên thiết bị.';
+    els.resultMeta.textContent = 'Bài viết chỉ được lưu trong trình duyệt này và không được tải lên máy chủ.';
     els.progressFill.style.width = '100%';
     renderMotivationStats();
 
     els.writingContent.innerHTML = `
+        ${buildWritingWorkspace()}
+
         <section class="writing-section writing-practice">
             <div class="writing-section-title">
                 <span class="review-tag">Luyện viết</span>
