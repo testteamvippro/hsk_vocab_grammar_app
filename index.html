@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-src 'none'; worker-src 'none'; upgrade-insecure-requests">
     <title>HSK Mastery | Flashcard HSK</title>
     <meta name="description" content="Ứng dụng học từ vựng và ngữ pháp HSK bằng flashcard, pinyin và nghĩa tiếng Việt">
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%E4%B9%A6%3C/text%3E%3C/svg%3E">
@@ -446,7 +448,7 @@
 
     <div class="toast" id="appToast" role="status" aria-live="polite"></div>
 
-    <script src="https://cdn.jsdelivr.net/npm/pinyin-pro@3.28.1/dist/index.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pinyin-pro@3.28.1/dist/index.js" integrity="sha384-XlVnSXtup9i9W3FDSN7dPiOvHCT3sdiSsv2pAzn4O/1l9bIb8GbNBrNaftgK/5Od" crossorigin="anonymous"></script>
     <script type="module" src="./js/app.js?v=20260718-reading-pinyin"></script>
 </body>
 </html>
