@@ -1,6 +1,7 @@
 import { vocabData } from '../data/vocab.js';
 import { grammarData } from '../data/grammar.js';
 import { testData } from '../data/tests.js';
+import { getReadings, readingThemes, readingCatalogStats } from '../data/readings.js';
 
 const standards = {
     new: {
@@ -17,6 +18,7 @@ const standards = {
 
 const progressStorageKey = 'hskMasteryProgress.v1';
 const statsStorageKey = 'hskMasteryStats.v1';
+const readingStorageKey = 'hskMasteryReadings.v1';
 const dailyGoalTarget = 20;
 const reviewIntervals = [1, 3, 7, 14, 30];
 const strokeBasics = [
@@ -114,11 +116,17 @@ let isPinyinHidden = false;
 let isShuffled = false;
 let unshuffledData = [];
 let toastTimer;
+let readingProgressState = loadReadingProgress();
+let readingCurrentPage = 1;
+let activeReading = null;
+let activeReadingAnswers = {};
+const readingsPerPage = 12;
 
 const els = {
     navStudy: document.getElementById('navStudy'),
     navDecks: document.getElementById('navDecks'),
     navReview: document.getElementById('navReview'),
+    navReading: document.getElementById('navReading'),
     navExam: document.getElementById('navExam'),
     navTests: document.getElementById('navTests'),
     navVideo: document.getElementById('navVideo'),
@@ -149,6 +157,32 @@ const els = {
     reviewDue: document.getElementById('reviewDue'),
     reviewVocab: document.getElementById('reviewVocab'),
     reviewGrammar: document.getElementById('reviewGrammar'),
+    readingPanel: document.getElementById('readingPanel'),
+    readingLibrary: document.getElementById('readingLibrary'),
+    readingSearch: document.getElementById('readingSearch'),
+    readingThemeFilter: document.getElementById('readingThemeFilter'),
+    readingStatusFilter: document.getElementById('readingStatusFilter'),
+    readingProgressText: document.getElementById('readingProgressText'),
+    readingLevelTitle: document.getElementById('readingLevelTitle'),
+    readingProgressFill: document.getElementById('readingProgressFill'),
+    readingGrid: document.getElementById('readingGrid'),
+    readingPagination: document.getElementById('readingPagination'),
+    readerView: document.getElementById('readerView'),
+    readerBack: document.getElementById('readerBack'),
+    readerSpeak: document.getElementById('readerSpeak'),
+    readerToggleTranslation: document.getElementById('readerToggleTranslation'),
+    readerToggleVocab: document.getElementById('readerToggleVocab'),
+    readerMeta: document.getElementById('readerMeta'),
+    readerTitle: document.getElementById('readerTitle'),
+    readerTitleVi: document.getElementById('readerTitleVi'),
+    readerChinese: document.getElementById('readerChinese'),
+    readerTranslation: document.getElementById('readerTranslation'),
+    readerVocabSection: document.getElementById('readerVocabSection'),
+    readerVocabCount: document.getElementById('readerVocabCount'),
+    readerVocabList: document.getElementById('readerVocabList'),
+    readerQuizScore: document.getElementById('readerQuizScore'),
+    readerQuestions: document.getElementById('readerQuestions'),
+    readerComplete: document.getElementById('readerComplete'),
     examPanel: document.getElementById('examPanel'),
     examTitle: document.getElementById('examTitle'),
     examIntro: document.getElementById('examIntro'),
@@ -241,6 +275,11 @@ const routeConfig = {
         nav: 'navReview',
         panel: 'reviewPanel',
     },
+    reading: {
+        nav: 'navReading',
+        panel: 'readingPanel',
+        forceVocab: true,
+    },
     exam: {
         nav: 'navExam',
         panel: 'examPanel',
@@ -275,6 +314,7 @@ els.navDecks.addEventListener('click', () => {
     setView('table');
 });
 els.navReview.addEventListener('click', () => showReviewRoute());
+els.navReading.addEventListener('click', () => showReadingRoute());
 els.navExam.addEventListener('click', () => showExamRoute());
 els.navTests.addEventListener('click', () => showTestRoute());
 els.navVideo.addEventListener('click', () => showVideoRoute());
@@ -300,6 +340,35 @@ els.recallPanel.addEventListener('click', (event) => {
     if (button) rateCurrentCard(button.dataset.recall);
 });
 document.addEventListener('keydown', handleStudyKeyboard);
+els.readingSearch.addEventListener('input', () => {
+    readingCurrentPage = 1;
+    renderReadingLibrary();
+});
+els.readingThemeFilter.addEventListener('change', () => {
+    readingCurrentPage = 1;
+    renderReadingLibrary();
+});
+els.readingStatusFilter.addEventListener('change', () => {
+    readingCurrentPage = 1;
+    renderReadingLibrary();
+});
+els.readingGrid.addEventListener('click', (event) => {
+    const card = event.target.closest('[data-reading-id]');
+    if (card) openReading(card.dataset.readingId);
+});
+els.readingPagination.addEventListener('click', (event) => {
+    const pageButton = event.target.closest('[data-reading-page]');
+    if (!pageButton) return;
+    readingCurrentPage = Number(pageButton.dataset.readingPage);
+    renderReadingLibrary();
+    els.readingPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
+els.readerBack.addEventListener('click', closeReader);
+els.readerSpeak.addEventListener('click', speakActiveReading);
+els.readerToggleTranslation.addEventListener('click', toggleReaderTranslation);
+els.readerToggleVocab.addEventListener('click', toggleReaderVocab);
+els.readerQuestions.addEventListener('click', handleReadingAnswer);
+els.readerComplete.addEventListener('click', completeActiveReading);
 els.cardLearned.addEventListener('change', () => {
     const item = currentFiltered[currentCardIndex];
     if (!item) return;
@@ -441,6 +510,13 @@ els.levelChips.addEventListener('click', (event) => {
         renderAiPanel(false);
         return;
     }
+    if (currentRoute === 'reading') {
+        readingCurrentPage = 1;
+        closeReader(false);
+        renderLevelChips();
+        renderReadingLibrary();
+        return;
+    }
     loadLevel();
 });
 
@@ -477,7 +553,8 @@ function switchStandard(standard) {
     const wasTests = currentRoute === 'tests';
     const wasVideo = currentRoute === 'video';
     const wasAi = currentRoute === 'ai';
-    if (!wasExam && !wasTests && !wasVideo && !wasAi) showStudyRoute(false);
+    const wasReading = currentRoute === 'reading';
+    if (!wasExam && !wasTests && !wasVideo && !wasAi && !wasReading) showStudyRoute(false);
     currentStandard = standard;
     currentLevel = getFirstPopulatedLevel(currentMode);
     els.btnHskNew.classList.toggle('active', standard === 'new');
@@ -500,6 +577,13 @@ function switchStandard(standard) {
     if (wasAi) {
         renderLevelChips();
         renderAiPanel(false);
+        return;
+    }
+    if (wasReading) {
+        readingCurrentPage = 1;
+        closeReader(false);
+        renderLevelChips();
+        renderReadingLibrary();
         return;
     }
     loadLevel();
@@ -536,6 +620,12 @@ function showExamRoute() {
 function showTestRoute() {
     activateRoute('tests');
     renderTestPage();
+}
+
+function showReadingRoute() {
+    activateRoute('reading');
+    closeReader(false);
+    renderReadingLibrary();
 }
 
 function showVideoRoute() {
@@ -597,6 +687,7 @@ function setActiveNav(activeKey) {
 
 function hideRoutePanels() {
     els.reviewPanel.hidden = true;
+    els.readingPanel.hidden = true;
     els.examPanel.hidden = true;
     els.testPanel.hidden = true;
     els.videoPanel.hidden = true;
@@ -1037,8 +1128,244 @@ function buildReviewControls(key, note) {
     `;
 }
 
+function renderReadingLibrary() {
+    if (els.readingThemeFilter.options.length === 0) {
+        els.readingThemeFilter.innerHTML = [
+            '<option value="all">Tất cả chủ đề</option>',
+            ...readingThemes.map((theme) => `<option value="${theme.id}">${theme.icon} ${theme.vi}</option>`),
+        ].join('');
+    }
+
+    const level = getLevelNumber(currentLevel);
+    const allReadings = getReadings(currentStandard, level);
+    const query = els.readingSearch.value.toLowerCase().trim();
+    const theme = els.readingThemeFilter.value || 'all';
+    const status = els.readingStatusFilter.value;
+    const filtered = allReadings.filter((reading) => {
+        const completed = Boolean(readingProgressState[reading.id]?.completed);
+        const matchesQuery = !query
+            || reading.title.toLowerCase().includes(query)
+            || reading.titleVi.toLowerCase().includes(query)
+            || reading.text.toLowerCase().includes(query)
+            || reading.themeName.toLowerCase().includes(query);
+        const matchesTheme = theme === 'all' || reading.theme === theme;
+        const matchesStatus = status === 'all'
+            || (status === 'completed' && completed)
+            || (status === 'unread' && !completed);
+        return matchesQuery && matchesTheme && matchesStatus;
+    });
+    const completedCount = allReadings.filter((reading) => readingProgressState[reading.id]?.completed).length;
+    const pageCount = Math.max(1, Math.ceil(filtered.length / readingsPerPage));
+    readingCurrentPage = Math.min(readingCurrentPage, pageCount);
+    const start = (readingCurrentPage - 1) * readingsPerPage;
+    const visible = filtered.slice(start, start + readingsPerPage);
+    const standardLabel = standards[currentStandard].label;
+    const levelName = formatLevel(currentLevel);
+
+    els.readingLevelTitle.textContent = `${levelName} Reading · ${standardLabel}`;
+    els.readingProgressText.textContent = `${completedCount}/100 bài hoàn thành`;
+    els.readingProgressFill.style.width = `${completedCount}%`;
+    els.readingGrid.innerHTML = visible.length
+        ? visible.map(buildReadingCard).join('')
+        : `<div class="reading-empty"><strong>Không tìm thấy bài phù hợp</strong><span>Hãy đổi từ khóa, chủ đề hoặc trạng thái.</span></div>`;
+    els.readingPagination.innerHTML = buildReadingPagination(pageCount);
+
+    els.surfaceTitle.textContent = 'Đọc hiểu theo cấp độ';
+    els.activeLevelLabel.textContent = levelName;
+    els.courseTitle.textContent = `${levelName} Reading · ${standardLabel}`;
+    els.levelHint.textContent = `100 bài đọc về vấn đề đời sống cho cấp này. Toàn thư viện có ${readingCatalogStats.total.toLocaleString('vi-VN')} bài nguyên bản.`;
+    els.wordCount.textContent = `${filtered.length} bài`;
+    els.resultMeta.textContent = filtered.length === 100
+        ? `Chọn một bài ngắn để bắt đầu luyện đọc ${levelName}.`
+        : `Đang hiển thị ${filtered.length}/100 bài phù hợp bộ lọc.`;
+    els.progressFill.style.width = `${completedCount}%`;
+}
+
+function buildReadingCard(reading) {
+    const completed = Boolean(readingProgressState[reading.id]?.completed);
+    const excerpt = reading.text.length > 78 ? `${reading.text.slice(0, 78)}…` : reading.text;
+    return `
+        <button class="reading-card${completed ? ' is-completed' : ''}" type="button" data-reading-id="${reading.id}">
+            <div class="reading-card-top">
+                <span class="reading-theme-icon">${reading.icon}</span>
+                <span>${escapeHtml(reading.themeName)}</span>
+                ${completed ? '<b>✓ Đã đọc</b>' : `<b>#${reading.number}</b>`}
+            </div>
+            <h5>${escapeHtml(reading.title)}</h5>
+            <p class="reading-card-vi">${escapeHtml(reading.titleVi)}</p>
+            <p class="reading-excerpt">${escapeHtml(excerpt)}</p>
+            <span class="reading-card-meta">${reading.text.length} chữ · 3 câu hỏi <i>Đọc bài →</i></span>
+        </button>
+    `;
+}
+
+function buildReadingPagination(pageCount) {
+    if (pageCount <= 1) return '';
+    const pages = Array.from({ length: pageCount }, (_, index) => index + 1);
+    return pages.map((page) => `
+        <button type="button" data-reading-page="${page}" class="${page === readingCurrentPage ? 'active' : ''}" aria-label="Trang ${page}">${page}</button>
+    `).join('');
+}
+
+function openReading(readingId) {
+    activeReading = getReadings(currentStandard, getLevelNumber(currentLevel)).find((reading) => reading.id === readingId);
+    if (!activeReading) return;
+    activeReadingAnswers = {};
+    els.readingLibrary.hidden = true;
+    els.readerView.hidden = false;
+    els.readerTranslation.hidden = true;
+    els.readerToggleTranslation.classList.remove('active');
+    els.readerToggleTranslation.setAttribute('aria-pressed', 'false');
+    els.readerVocabSection.hidden = false;
+    els.readerToggleVocab.classList.add('active');
+    els.readerToggleVocab.setAttribute('aria-pressed', 'true');
+
+    els.readerMeta.textContent = `${formatLevel(currentLevel)} · ${standards[currentStandard].label} · ${activeReading.themeName}`;
+    els.readerTitle.textContent = activeReading.title;
+    els.readerTitleVi.textContent = activeReading.titleVi;
+    els.readerChinese.textContent = activeReading.text;
+    els.readerTranslation.textContent = activeReading.translation;
+    renderReaderVocabulary();
+    renderReaderQuestions();
+    syncReaderCompleteButton();
+    els.readerView.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function closeReader(scroll = true) {
+    if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+    activeReading = null;
+    activeReadingAnswers = {};
+    els.readerView.hidden = true;
+    els.readingLibrary.hidden = false;
+    if (scroll && currentRoute === 'reading') els.readingPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function renderReaderVocabulary() {
+    if (!activeReading) return;
+    const words = getData('vocab', currentLevel)
+        .filter((item) => String(item.hanzi || '').split('｜').some((word) => word.length > 0 && activeReading.text.includes(word)))
+        .sort((a, b) => b.hanzi.length - a.hanzi.length)
+        .slice(0, 18);
+    els.readerVocabCount.textContent = `${words.length} từ`;
+    els.readerVocabList.innerHTML = words.length
+        ? words.map((item) => `
+            <div class="reader-word">
+                <strong>${escapeHtml(item.hanzi)}</strong>
+                <span>${escapeHtml(item.pinyin)}</span>
+                <p>${escapeHtml(getMeaning(item))}</p>
+            </div>
+        `).join('')
+        : '<p class="reader-no-vocab">Hãy dùng bản dịch để hiểu nội dung bài này.</p>';
+}
+
+function renderReaderQuestions() {
+    if (!activeReading) return;
+    els.readerQuestions.innerHTML = activeReading.questions.map((question, questionIndex) => {
+        const rotation = (activeReading.number + questionIndex) % question.options.length;
+        const options = [...question.options.slice(rotation), ...question.options.slice(0, rotation)];
+        const correctText = question.options[question.answer];
+        const correctIndex = options.indexOf(correctText);
+        const response = activeReadingAnswers[questionIndex];
+        return `
+            <article class="reader-question${response ? ' is-answered' : ''}">
+                <span>Câu ${questionIndex + 1}</span>
+                <h6>${escapeHtml(question.prompt)}</h6>
+                <p>${escapeHtml(question.promptVi)}</p>
+                <div class="reader-options">
+                    ${options.map((option, optionIndex) => {
+                        const isSelected = response?.selected === optionIndex;
+                        const className = response
+                            ? optionIndex === correctIndex ? 'correct' : isSelected ? 'wrong' : ''
+                            : '';
+                        return `<button type="button" class="${className}" data-question="${questionIndex}" data-option="${optionIndex}" data-correct="${correctIndex}" ${response ? 'disabled' : ''}>${escapeHtml(option)}</button>`;
+                    }).join('')}
+                </div>
+                ${response ? `<div class="question-feedback ${response.correct ? 'correct' : 'wrong'}">${response.correct ? '✓ Chính xác' : `Đáp án đúng: ${escapeHtml(correctText)}`}${question.explanation ? ` · ${escapeHtml(question.explanation)}` : ''}</div>` : ''}
+            </article>
+        `;
+    }).join('');
+    const correctCount = Object.values(activeReadingAnswers).filter((answer) => answer.correct).length;
+    els.readerQuizScore.textContent = `${correctCount}/3`;
+}
+
+function handleReadingAnswer(event) {
+    const option = event.target.closest('[data-question]');
+    if (!option || !activeReading) return;
+    const questionIndex = Number(option.dataset.question);
+    if (activeReadingAnswers[questionIndex]) return;
+    const selected = Number(option.dataset.option);
+    const correct = Number(option.dataset.correct);
+    activeReadingAnswers[questionIndex] = { selected, correct: selected === correct };
+    renderReaderQuestions();
+}
+
+function toggleReaderTranslation() {
+    const show = els.readerTranslation.hidden;
+    els.readerTranslation.hidden = !show;
+    els.readerToggleTranslation.classList.toggle('active', show);
+    els.readerToggleTranslation.setAttribute('aria-pressed', String(show));
+}
+
+function toggleReaderVocab() {
+    const show = els.readerVocabSection.hidden;
+    els.readerVocabSection.hidden = !show;
+    els.readerToggleVocab.classList.toggle('active', show);
+    els.readerToggleVocab.setAttribute('aria-pressed', String(show));
+}
+
+function speakActiveReading() {
+    if (!activeReading || !('speechSynthesis' in window)) {
+        showToast('Trình duyệt này chưa hỗ trợ đọc thành tiếng.');
+        return;
+    }
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(activeReading.text);
+    utterance.lang = 'zh-CN';
+    utterance.rate = Math.max(0.68, 0.9 - getLevelNumber(currentLevel) * 0.02);
+    const voice = window.speechSynthesis.getVoices().find((item) => item.lang.toLowerCase().startsWith('zh'));
+    if (voice) utterance.voice = voice;
+    els.readerSpeak.classList.add('is-speaking');
+    utterance.onend = () => els.readerSpeak.classList.remove('is-speaking');
+    window.speechSynthesis.speak(utterance);
+}
+
+function completeActiveReading() {
+    if (!activeReading) return;
+    const wasCompleted = Boolean(readingProgressState[activeReading.id]?.completed);
+    readingProgressState[activeReading.id] = {
+        completed: true,
+        completedAt: readingProgressState[activeReading.id]?.completedAt || new Date().toISOString(),
+        score: Object.values(activeReadingAnswers).filter((answer) => answer.correct).length,
+    };
+    saveReadingProgress();
+    if (!wasCompleted) recordStudyActivity(10);
+    syncReaderCompleteButton();
+    showToast(wasCompleted ? 'Bài này đã có trong tiến độ.' : 'Đã hoàn thành bài đọc · +10 XP');
+}
+
+function syncReaderCompleteButton() {
+    const completed = Boolean(activeReading && readingProgressState[activeReading.id]?.completed);
+    els.readerComplete.classList.toggle('is-completed', completed);
+    els.readerComplete.textContent = completed ? '✓ Đã hoàn thành bài đọc' : 'Đánh dấu đã đọc';
+}
+
+function loadReadingProgress() {
+    if (typeof localStorage === 'undefined') return {};
+    try {
+        const parsed = JSON.parse(localStorage.getItem(readingStorageKey) || '{}');
+        return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+    } catch {
+        return {};
+    }
+}
+
+function saveReadingProgress() {
+    if (typeof localStorage === 'undefined') return;
+    localStorage.setItem(readingStorageKey, JSON.stringify(readingProgressState));
+}
+
 function renderEmptyState() {
-    if (currentRoute === 'review' || currentRoute === 'exam' || currentRoute === 'tests' || currentRoute === 'writing' || currentRoute === 'ai') {
+    if (currentRoute === 'review' || currentRoute === 'reading' || currentRoute === 'exam' || currentRoute === 'tests' || currentRoute === 'writing' || currentRoute === 'ai') {
         els.emptyState.hidden = true;
         return;
     }

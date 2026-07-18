@@ -33,6 +33,10 @@
                     <span aria-hidden="true">✓</span>
                     Ôn tập
                 </button>
+                <button class="side-link" id="navReading" type="button">
+                    <span aria-hidden="true">阅</span>
+                    Đọc hiểu
+                </button>
                 <button class="side-link" id="navExam" type="button">
                     <span aria-hidden="true">◎</span>
                     Thi thử
@@ -227,6 +231,80 @@
                             <button class="review-filter" id="reviewGrammar" type="button" data-filter="grammar">Ngữ pháp</button>
                         </div>
                         <div class="review-list" id="reviewList"></div>
+                    </div>
+
+                    <div class="reading-panel" id="readingPanel" hidden>
+                        <div class="reading-library" id="readingLibrary">
+                            <div class="reading-toolbar">
+                                <div>
+                                    <span class="review-tag">1.500 bài đọc nguyên bản</span>
+                                    <h4>Đọc chuyện đời sống theo trình độ</h4>
+                                    <p>100 tình huống cho mỗi cấp HSK, có bản dịch, phát âm, từ quan trọng và câu hỏi đọc hiểu.</p>
+                                </div>
+                                <div class="reading-filters">
+                                    <label class="reading-search">
+                                        <span>Tìm bài</span>
+                                        <input id="readingSearch" type="search" placeholder="Chủ đề hoặc tình huống...">
+                                    </label>
+                                    <label>
+                                        <span>Chủ đề</span>
+                                        <select id="readingThemeFilter"></select>
+                                    </label>
+                                    <label>
+                                        <span>Trạng thái</span>
+                                        <select id="readingStatusFilter">
+                                            <option value="all">Tất cả</option>
+                                            <option value="unread">Chưa đọc</option>
+                                            <option value="completed">Đã hoàn thành</option>
+                                        </select>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="reading-progress-card">
+                                <div>
+                                    <span id="readingProgressText">0/100 bài hoàn thành</span>
+                                    <strong id="readingLevelTitle">HSK 1 Reading</strong>
+                                </div>
+                                <div class="reading-progress-track"><span id="readingProgressFill"></span></div>
+                            </div>
+                            <div class="reading-grid" id="readingGrid"></div>
+                            <div class="reading-pagination" id="readingPagination"></div>
+                        </div>
+
+                        <article class="reader-view" id="readerView" hidden>
+                            <div class="reader-topbar">
+                                <button class="reader-back" id="readerBack" type="button">← Thư viện</button>
+                                <div class="reader-actions">
+                                    <button class="tool-action" id="readerSpeak" type="button">◖)) Nghe bài</button>
+                                    <button class="tool-action" id="readerToggleTranslation" type="button" aria-pressed="false">VI Bản dịch</button>
+                                    <button class="tool-action" id="readerToggleVocab" type="button" aria-pressed="true">拼 Từ quan trọng</button>
+                                </div>
+                            </div>
+                            <header class="reader-header">
+                                <span class="review-tag" id="readerMeta">HSK 1 · Sinh hoạt</span>
+                                <h4 id="readerTitle">Bài đọc</h4>
+                                <p id="readerTitleVi"></p>
+                            </header>
+                            <div class="reader-paper">
+                                <p class="reader-chinese" id="readerChinese"></p>
+                                <p class="reader-translation" id="readerTranslation" hidden></p>
+                            </div>
+                            <section class="reader-vocab" id="readerVocabSection">
+                                <div class="reader-section-title">
+                                    <div><span class="eyebrow">TỪ TRONG BÀI</span><h5>Từ quan trọng</h5></div>
+                                    <span id="readerVocabCount">0 từ</span>
+                                </div>
+                                <div class="reader-vocab-list" id="readerVocabList"></div>
+                            </section>
+                            <section class="reader-quiz">
+                                <div class="reader-section-title">
+                                    <div><span class="eyebrow">KIỂM TRA NHANH</span><h5>Bạn hiểu bài đến đâu?</h5></div>
+                                    <span id="readerQuizScore">0/3</span>
+                                </div>
+                                <div id="readerQuestions"></div>
+                            </section>
+                            <button class="reader-complete" id="readerComplete" type="button">Đánh dấu đã đọc</button>
+                        </article>
                     </div>
 
                     <div class="exam-panel" id="examPanel" hidden>
