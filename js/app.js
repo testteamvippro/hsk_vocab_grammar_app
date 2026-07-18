@@ -170,6 +170,7 @@ const els = {
     readerView: document.getElementById('readerView'),
     readerBack: document.getElementById('readerBack'),
     readerSpeak: document.getElementById('readerSpeak'),
+    readerTogglePinyin: document.getElementById('readerTogglePinyin'),
     readerToggleTranslation: document.getElementById('readerToggleTranslation'),
     readerToggleVocab: document.getElementById('readerToggleVocab'),
     readerMeta: document.getElementById('readerMeta'),
@@ -365,6 +366,7 @@ els.readingPagination.addEventListener('click', (event) => {
 });
 els.readerBack.addEventListener('click', closeReader);
 els.readerSpeak.addEventListener('click', speakActiveReading);
+els.readerTogglePinyin.addEventListener('click', toggleReaderPinyin);
 els.readerToggleTranslation.addEventListener('click', toggleReaderTranslation);
 els.readerToggleVocab.addEventListener('click', toggleReaderVocab);
 els.readerQuestions.addEventListener('click', handleReadingAnswer);
@@ -1216,6 +1218,9 @@ function openReading(readingId) {
     els.readerTranslation.hidden = true;
     els.readerToggleTranslation.classList.remove('active');
     els.readerToggleTranslation.setAttribute('aria-pressed', 'false');
+    els.readerChinese.classList.remove('hide-reading-pinyin');
+    els.readerTogglePinyin.classList.add('active');
+    els.readerTogglePinyin.setAttribute('aria-pressed', 'true');
     els.readerVocabSection.hidden = false;
     els.readerToggleVocab.classList.add('active');
     els.readerToggleVocab.setAttribute('aria-pressed', 'true');
@@ -1223,7 +1228,7 @@ function openReading(readingId) {
     els.readerMeta.textContent = `${formatLevel(currentLevel)} · ${standards[currentStandard].label} · ${activeReading.themeName}`;
     els.readerTitle.textContent = activeReading.title;
     els.readerTitleVi.textContent = activeReading.titleVi;
-    els.readerChinese.textContent = activeReading.text;
+    renderReadingPinyin();
     els.readerTranslation.textContent = activeReading.translation;
     renderReaderVocabulary();
     renderReaderQuestions();
@@ -1304,6 +1309,35 @@ function toggleReaderTranslation() {
     els.readerTranslation.hidden = !show;
     els.readerToggleTranslation.classList.toggle('active', show);
     els.readerToggleTranslation.setAttribute('aria-pressed', String(show));
+}
+
+function toggleReaderPinyin() {
+    const show = els.readerChinese.classList.contains('hide-reading-pinyin');
+    els.readerChinese.classList.toggle('hide-reading-pinyin', !show);
+    els.readerTogglePinyin.classList.toggle('active', show);
+    els.readerTogglePinyin.setAttribute('aria-pressed', String(show));
+}
+
+function renderReadingPinyin() {
+    if (!activeReading) return;
+    const converter = window.pinyinPro;
+    if (!converter?.html) {
+        els.readerChinese.textContent = activeReading.text;
+        els.readerTogglePinyin.disabled = true;
+        els.readerTogglePinyin.title = 'Không thể tải bộ chuyển đổi pinyin.';
+        return;
+    }
+
+    els.readerTogglePinyin.disabled = false;
+    els.readerTogglePinyin.title = 'Ẩn hoặc hiện pinyin dưới từng chữ.';
+    els.readerChinese.innerHTML = converter.html(activeReading.text, {
+        toneType: 'symbol',
+        wrapNonChinese: true,
+        resultClass: 'reading-pinyin-item',
+        chineseClass: 'reading-hanzi',
+        pinyinClass: 'reading-phonetic',
+        nonChineseClass: 'reading-punctuation',
+    });
 }
 
 function toggleReaderVocab() {

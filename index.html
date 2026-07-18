@@ -7,7 +7,7 @@
     <meta name="description" content="Ứng dụng học từ vựng và ngữ pháp HSK bằng flashcard, pinyin và nghĩa tiếng Việt">
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%E4%B9%A6%3C/text%3E%3C/svg%3E">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="./css/style.css?v=20260718-modern-study">
+    <link rel="stylesheet" href="./css/style.css?v=20260718-reading-pinyin">
 </head>
 <body>
     <div class="app-shell">
@@ -276,8 +276,9 @@
                                 <button class="reader-back" id="readerBack" type="button">← Thư viện</button>
                                 <div class="reader-actions">
                                     <button class="tool-action" id="readerSpeak" type="button">◖)) Nghe bài</button>
+                                    <button class="tool-action active" id="readerTogglePinyin" type="button" aria-pressed="true">P 拼音</button>
                                     <button class="tool-action" id="readerToggleTranslation" type="button" aria-pressed="false">VI Bản dịch</button>
-                                    <button class="tool-action" id="readerToggleVocab" type="button" aria-pressed="true">拼 Từ quan trọng</button>
+                                    <button class="tool-action" id="readerToggleVocab" type="button" aria-pressed="true">词 Từ quan trọng</button>
                                 </div>
                             </div>
                             <header class="reader-header">
@@ -445,6 +446,7 @@
 
     <div class="toast" id="appToast" role="status" aria-live="polite"></div>
 
-    <script type="module" src="./js/app.js?v=20260718-modern-study"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pinyin-pro@3.28.1/dist/index.js"></script>
+    <script type="module" src="./js/app.js?v=20260718-reading-pinyin"></script>
 </body>
 </html>
