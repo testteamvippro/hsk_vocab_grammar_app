@@ -153,6 +153,7 @@ let pinyinDictionaryCache = null;
 let currentPinyinCandidates = [];
 let handwritingPracticeText = '啊矮爱人安静排八把爸';
 let activeHandwritingCanvas = null;
+let writingSubpage = 'worksheet';
 
 const els = {
     navStudy: document.getElementById('navStudy'),
@@ -2423,6 +2424,55 @@ function buildHandwritingNotebook() {
     `;
 }
 
+function buildWritingSubpageNav() {
+    return `
+        <div class="writing-subnav" role="tablist" aria-label="Chọn trang viết">
+            <button class="${writingSubpage === 'worksheet' ? 'active' : ''}" type="button" role="tab" aria-selected="${writingSubpage === 'worksheet'}" data-writing-action="switch-subpage" data-writing-subpage="worksheet">▦ Vở luyện chữ</button>
+            <button class="${writingSubpage === 'notes' ? 'active' : ''}" type="button" role="tab" aria-selected="${writingSubpage === 'notes'}" data-writing-action="switch-subpage" data-writing-subpage="notes">✎ Ghi chú tiếng Trung</button>
+        </div>
+    `;
+}
+
+function buildChineseNotesPage() {
+    const activeDraft = writingDrafts.find((draft) => draft.id === activeWritingDraftId) || null;
+    const draftText = activeDraft?.text || '';
+    const hanziCount = (draftText.match(/[\u3400-\u9fff]/g) || []).length;
+    return `
+        <section class="apple-notes-layout">
+            <aside class="notes-sidebar">
+                <div class="notes-sidebar-heading">
+                    <div><span>GHI CHÚ</span><h4>Trên thiết bị</h4></div>
+                    <strong id="draftCount">${writingDrafts.length}</strong>
+                </div>
+                <button class="notes-new-button" type="button" data-writing-action="new">＋ Ghi chú mới</button>
+                <div class="draft-list" id="writingDraftList">${buildWritingDraftList()}</div>
+            </aside>
+
+            <article class="apple-note-paper">
+                <div class="apple-note-toolbar">
+                    <span>Hôm nay</span>
+                    <div>
+                        <select id="compositionLevel" aria-label="Cấp HSK">
+                            ${Array.from({ length: 9 }, (_, index) => `<option value="${index + 1}" ${String(index + 1) === String(activeDraft?.level || '1') ? 'selected' : ''}>HSK ${index + 1}</option>`).join('')}
+                        </select>
+                        <button type="button" data-writing-action="save">Lưu</button>
+                    </div>
+                </div>
+                <input id="compositionTitle" class="apple-note-title" type="text" maxlength="80" value="${escapeHtml(activeDraft?.title || '')}" placeholder="Tiêu đề ghi chú">
+                <textarea id="compositionEditor" class="apple-note-editor" rows="12" maxlength="5000" lang="zh-CN" spellcheck="false" placeholder="在这里写中文……\nViết suy nghĩ, từ mới hoặc một đoạn văn bằng tiếng Trung.">${escapeHtml(draftText)}</textarea>
+                <div class="apple-note-footer"><span id="compositionCount">${hanziCount} chữ Hán · ${draftText.length} ký tự</span><span>⌘ Lưu trên thiết bị</span></div>
+                <input id="compositionPinyin" type="hidden" value="">
+                <div id="pinyinCandidates" hidden></div>
+                <div class="note-handwriting-area">
+                    <div><strong>Viết tay</strong><span>Dùng Apple Pencil hoặc ngón tay để phác thảo câu, chữ mới.</span></div>
+                    <canvas class="handwriting-canvas note-canvas" data-handwriting-canvas="note" aria-label="Vùng ghi chú viết tay"></canvas>
+                    <button class="canvas-clear" type="button" data-writing-action="clear-handwriting" data-canvas-id="note">Xóa nét</button>
+                </div>
+            </article>
+        </section>
+    `;
+}
+
 function buildWritingDraftList() {
     if (writingDrafts.length === 0) {
         return `<div class="draft-empty"><strong>Chưa có bản nháp</strong><span>Viết đoạn đầu tiên rồi bấm “Lưu bản nháp”.</span></div>`;
@@ -2467,6 +2517,11 @@ function handleWritingWorkspaceClick(event) {
     if (!actionTarget) return;
     const action = actionTarget.dataset.writingAction;
 
+    if (action === 'switch-subpage') {
+        writingSubpage = actionTarget.dataset.writingSubpage;
+        renderWritingPage();
+        return;
+    }
     if (action === 'convert') convertPinyinComposerText();
     if (action === 'candidate') insertPinyinCandidate(Number(actionTarget.dataset.candidateIndex));
     if (action === 'save') saveCurrentWritingDraft();
@@ -2523,6 +2578,16 @@ function drawHandwritingGuides(canvas) {
     context.lineWidth = 1;
     context.setLineDash([4, 4]);
     context.beginPath();
+    if (canvas.classList.contains('note-canvas')) {
+        context.setLineDash([]);
+        for (let y = 34; y < height; y += 34) {
+            context.moveTo(0, y);
+            context.lineTo(width, y);
+        }
+        context.stroke();
+        context.restore();
+        return;
+    }
     context.moveTo(0, height / 2);
     context.lineTo(width, height / 2);
     context.moveTo(width / 2, 0);
@@ -2878,15 +2943,16 @@ function formatDraftDate(value) {
 
 function renderWritingPage() {
     els.surfaceTitle.textContent = 'Viết tiếng Trung';
-    els.wordCount.textContent = 'Vở luyện viết';
-    els.activeLevelLabel.textContent = 'Luyện viết';
-    els.courseTitle.textContent = 'Vở luyện chữ Hán';
-    els.levelHint.textContent = 'Tạo dòng mẫu cho từng chữ, rồi viết trực tiếp bằng Apple Pencil hoặc ngón tay.';
-    els.resultMeta.textContent = 'Trang này chỉ dành cho luyện viết chữ. Nét viết được giữ trên thiết bị của bạn.';
+    const isNotesPage = writingSubpage === 'notes';
+    els.wordCount.textContent = isNotesPage ? `${writingDrafts.length} ghi chú` : 'Vở luyện viết';
+    els.activeLevelLabel.textContent = isNotesPage ? 'Ghi chú' : 'Luyện viết';
+    els.courseTitle.textContent = isNotesPage ? 'Ghi chú tiếng Trung' : 'Vở luyện chữ Hán';
+    els.levelHint.textContent = isNotesPage ? 'Gõ, lưu và viết tay các đoạn văn tiếng Trung theo phong cách Apple Notes.' : 'Tạo dòng mẫu cho từng chữ, rồi viết trực tiếp bằng Apple Pencil hoặc ngón tay.';
+    els.resultMeta.textContent = isNotesPage ? 'Ghi chú văn bản được lưu riêng trên trình duyệt này.' : 'Trang này chỉ dành cho luyện viết chữ. Nét viết được giữ trên thiết bị của bạn.';
     els.progressFill.style.width = '100%';
     renderMotivationStats();
 
-    els.writingContent.innerHTML = buildHandwritingNotebook();
+    els.writingContent.innerHTML = `${buildWritingSubpageNav()}${isNotesPage ? buildChineseNotesPage() : buildHandwritingNotebook()}`;
     initializeHandwritingCanvases();
     return;
 

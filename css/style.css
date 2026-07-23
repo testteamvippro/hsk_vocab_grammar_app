@@ -1672,6 +1672,60 @@ tbody tr:hover {
 }
 .worksheet-footer { margin-top: 10px; border-top: 1px solid #999; color: #777; font-size: .68rem; padding-top: 5px; text-align: center; }
 
+.writing-subnav {
+    display: inline-flex;
+    align-self: start;
+    gap: 4px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: #fff;
+    padding: 4px;
+}
+.writing-subnav button {
+    min-height: 36px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--muted);
+    font-size: .82rem;
+    font-weight: 800;
+    padding: 7px 12px;
+}
+.writing-subnav button.active { background: #f6d76b; color: #5c4200; }
+
+.apple-notes-layout {
+    display: grid;
+    grid-template-columns: 250px minmax(0, 1fr);
+    min-height: 700px;
+    overflow: hidden;
+    border: 1px solid #d7d7d7;
+    border-radius: 18px;
+    background: #f1f1f3;
+    box-shadow: 0 16px 40px rgba(15, 23, 42, .12);
+}
+.notes-sidebar { display: grid; grid-template-rows: auto auto minmax(0, 1fr); gap: 11px; border-right: 1px solid #d2d2d4; background: rgba(244, 244, 246, .96); padding: 16px 10px; }
+.notes-sidebar-heading { display: flex; align-items: center; justify-content: space-between; padding: 2px 5px; }
+.notes-sidebar-heading span { color: #8b8b90; font-size: .68rem; font-weight: 900; letter-spacing: .08em; }
+.notes-sidebar-heading h4 { color: #202124; font-size: 1rem; }
+.notes-sidebar-heading strong { display: grid; width: 28px; height: 28px; place-items: center; border-radius: 50%; background: #e1e1e5; color: #55555b; font-size: .72rem; }
+.notes-new-button { min-height: 36px; border: 0; border-radius: 9px; background: #ffcb31; color: #513a00; font-size: .78rem; font-weight: 900; }
+.notes-sidebar .draft-list { max-height: none; padding: 0; }
+.apple-note-paper { position: relative; display: grid; align-content: start; min-width: 0; background-color: #fffef9; background-image: linear-gradient(transparent 33px, #dce7f5 34px); background-size: 100% 34px; padding: 16px 28px 28px; }
+.apple-note-toolbar { display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #e4e4e4; color: #888; font-size: .75rem; padding-bottom: 11px; }
+.apple-note-toolbar > div { display: flex; gap: 7px; }
+.apple-note-toolbar select,
+.apple-note-toolbar button { min-height: 30px; border: 1px solid #d8d8d8; border-radius: 7px; background: #fff; color: #505055; font-size: .75rem; font-weight: 800; padding: 4px 8px; }
+.apple-note-toolbar button { border: 0; background: #ffca28; color: #513a00; }
+.apple-note-title { width: 100%; border: 0; outline: none; background: transparent; color: #1b1b1d; font-size: clamp(1.6rem, 4vw, 2.25rem); font-weight: 800; padding: 19px 0 7px; }
+.apple-note-editor { width: 100%; min-height: 320px; border: 0; outline: none; resize: vertical; background: transparent; color: #28282c; font-family: 'Noto Sans SC', 'Inter', sans-serif; font-size: 1.06rem; line-height: 34px; padding: 0; }
+.apple-note-footer { display: flex; justify-content: space-between; color: #888; font-size: .7rem; padding: 7px 0 13px; }
+.note-handwriting-area { position: relative; display: grid; gap: 7px; border-top: 1px solid #e2e2e2; padding-top: 14px; }
+.note-handwriting-area > div { display: grid; gap: 2px; }
+.note-handwriting-area strong { color: #333; font-size: .86rem; }
+.note-handwriting-area span { color: #8a8a8f; font-size: .74rem; }
+.note-canvas { width: 100%; height: 260px; min-width: 0; border: 1px solid #dce5ef; border-radius: 9px; background: rgba(255,255,255,.62); }
+.note-handwriting-area .canvas-clear { top: 55px; }
+
 @media (max-width: 780px) {
     .handwriting-controls { grid-template-columns: 1fr 1fr; }
     .handwriting-controls label { grid-column: 1 / -1; }
@@ -1694,6 +1748,11 @@ tbody tr:hover {
     .worksheet-paper .character-notebook-row { grid-template-columns: 34px minmax(0, 1fr); }
     .worksheet-paper .notebook-square-grid { grid-template-columns: repeat(10, 54px); }
     .worksheet-sentence { margin-left: 0; }
+    .writing-subnav { display: grid; grid-template-columns: 1fr 1fr; width: 100%; }
+    .apple-notes-layout { grid-template-columns: 1fr; border-radius: 14px; }
+    .notes-sidebar { max-height: 245px; border-right: 0; border-bottom: 1px solid #d2d2d4; }
+    .apple-note-paper { min-height: 630px; padding: 13px 16px 22px; }
+    .apple-note-editor { min-height: 270px; }
 }
 
 .stroke-grid {
