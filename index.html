@@ -4,12 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="referrer" content="strict-origin-when-cross-origin">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-src 'none'; worker-src 'none'; upgrade-insecure-requests">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' blob: https://translate.google.com; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-src 'none'; worker-src 'none'; upgrade-insecure-requests">
     <title>HSK Mastery | Flashcard HSK</title>
-    <meta name="description" content="Ứng dụng học từ vựng và ngữ pháp HSK bằng flashcard, pinyin và nghĩa tiếng Việt">
+    <meta name="description" content="Ứng dụng học từ vựng và ngữ pháp HSK với phát âm Phổ thông và Quảng Đông">
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%E4%B9%A6%3C/text%3E%3C/svg%3E">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="./css/style.css?v=20260718-writing-composer">
+    <link rel="stylesheet" href="./css/style.css?v=20260723-cantonese-pronunciation">
 </head>
 <body>
     <div class="app-shell">
@@ -174,8 +174,11 @@
                     <div class="deck-panel" id="deckPanel">
                         <div class="session-toolbar" aria-label="Công cụ phiên học">
                             <div class="session-tools">
-                                <button class="tool-action" id="speakCard" type="button" title="Nghe phát âm (S)">
-                                    <span aria-hidden="true">◖))</span> Nghe
+                                <button class="tool-action" id="speakMandarin" type="button" title="Nghe tiếng Phổ thông bằng Google Translate (S)">
+                                    <span aria-hidden="true">◖))</span> Phổ thông
+                                </button>
+                                <button class="tool-action cantonese-action" id="speakCantonese" type="button" title="Nghe tiếng Quảng Đông bằng Google Translate (C)">
+                                    <span aria-hidden="true">◖))</span> Quảng Đông
                                 </button>
                                 <button class="tool-action" id="togglePinyin" type="button" aria-pressed="false" title="Ẩn hoặc hiện pinyin (P)">
                                     <span aria-hidden="true">拼</span> Ẩn pinyin
@@ -184,7 +187,7 @@
                                     <span aria-hidden="true">⇄</span> Trộn thẻ
                                 </button>
                             </div>
-                            <span class="shortcut-hint">Space lật · ← → chuyển · 1–4 đánh giá</span>
+                            <span class="shortcut-hint">S Phổ thông · C Quảng Đông · Space lật · ← → chuyển</span>
                         </div>
 
                         <article class="study-card" id="studyCard" tabindex="0" role="button" aria-label="Nhấn để lật thẻ">
@@ -197,6 +200,10 @@
                             <div class="card-answer" id="cardAnswer">
                                 <p id="cardMeaning">Xin chào</p>
                                 <span id="cardExample">Nhấn lật thẻ để kiểm tra nghĩa.</span>
+                                <div class="pronunciation-compare" id="pronunciationCompare">
+                                    <span><b>普通话</b><em id="cardMandarin">nǐ hǎo</em></span>
+                                    <span><b>廣東話</b><em id="cardCantonese">Nghe qua Google Translate</em></span>
+                                </div>
                             </div>
                         </article>
 
@@ -449,6 +456,6 @@
     <div class="toast" id="appToast" role="status" aria-live="polite"></div>
 
     <script src="https://cdn.jsdelivr.net/npm/pinyin-pro@3.28.1/dist/index.js" integrity="sha384-XlVnSXtup9i9W3FDSN7dPiOvHCT3sdiSsv2pAzn4O/1l9bIb8GbNBrNaftgK/5Od" crossorigin="anonymous"></script>
-    <script type="module" src="./js/app.js?v=20260718-writing-composer"></script>
+    <script type="module" src="./js/app.js?v=20260723-cantonese-pronunciation"></script>
 </body>
 </html>

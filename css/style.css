@@ -814,6 +814,20 @@ tbody tr:hover {
     padding: 3px 10px;
 }
 
+.cell-pronunciation { min-width: 178px; }
+.table-speak {
+    border: 1px solid #cfe1ff;
+    border-radius: 999px;
+    background: var(--blue-soft);
+    color: var(--blue-dark);
+    font-size: .72rem;
+    font-weight: 800;
+    padding: 5px 8px;
+}
+.table-speak + .table-speak { margin-left: 5px; }
+.table-speak.cantonese { border-color: #c8eee0; background: #ebfbf4; color: #087a55; }
+.table-speak:hover { filter: brightness(.96); }
+
 .cell-vi,
 .cell-structure {
     color: var(--ink);
@@ -2570,6 +2584,25 @@ tbody tr:hover {
 }
 .study-card:focus-visible { outline: 4px solid rgba(91,92,226,.2); outline-offset: 2px; }
 .study-card.hide-pinyin .card-main span { opacity: 0; user-select: none; }
+.pronunciation-compare {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    width: min(100%, 540px);
+    margin: 15px auto 0;
+    text-align: left;
+}
+.pronunciation-compare > span {
+    display: grid;
+    gap: 2px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: #fff;
+    padding: 8px 10px;
+}
+.pronunciation-compare b { color: var(--blue-dark); font-size: .68rem; letter-spacing: .04em; }
+.pronunciation-compare > span:last-child b { color: #087a55; }
+.pronunciation-compare em { color: var(--text); font-size: .78rem; font-style: normal; }
 .flip-action { border-radius: 999px; background: var(--ink); padding-inline: 28px; }
 
 .session-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
@@ -2656,6 +2689,8 @@ tbody tr:hover {
 @media (max-width: 560px) {
     .course-hero { border-radius: 20px; }
     .study-card { min-height: 320px; border-radius: 20px; }
-    .session-tools { display: grid; width: 100%; grid-template-columns: repeat(3, 1fr); }
+    .session-tools { display: grid; width: 100%; grid-template-columns: repeat(2, 1fr); }
     .tool-action { justify-content: center; padding-inline: 7px; }
+    .pronunciation-compare { grid-template-columns: 1fr; }
+    .cell-pronunciation { min-width: 0; }
 }

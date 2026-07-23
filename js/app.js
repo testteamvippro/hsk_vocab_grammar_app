@@ -141,6 +141,7 @@ let isPinyinHidden = false;
 let isShuffled = false;
 let unshuffledData = [];
 let toastTimer;
+let activeSpeechAudio = null;
 let readingProgressState = loadReadingProgress();
 let readingCurrentPage = 1;
 let activeReading = null;
@@ -265,13 +266,17 @@ const els = {
     cardAnswer: document.getElementById('cardAnswer'),
     cardMeaning: document.getElementById('cardMeaning'),
     cardExample: document.getElementById('cardExample'),
+    pronunciationCompare: document.getElementById('pronunciationCompare'),
+    cardMandarin: document.getElementById('cardMandarin'),
+    cardCantonese: document.getElementById('cardCantonese'),
     prevCard: document.getElementById('prevCard'),
     nextCard: document.getElementById('nextCard'),
     flipCard: document.getElementById('flipCard'),
     studyNotePanel: document.getElementById('studyNotePanel'),
     cardLearned: document.getElementById('cardLearned'),
     cardNote: document.getElementById('cardNote'),
-    speakCard: document.getElementById('speakCard'),
+    speakMandarin: document.getElementById('speakMandarin'),
+    speakCantonese: document.getElementById('speakCantonese'),
     togglePinyin: document.getElementById('togglePinyin'),
     shuffleCards: document.getElementById('shuffleCards'),
     recallPanel: document.getElementById('recallPanel'),
@@ -281,7 +286,7 @@ const els = {
 
 const tableConfig = {
     vocab: {
-        columns: ['#', 'Hán tự', 'Pinyin', 'Tiếng Việt', 'English', 'Đã học'],
+        columns: ['#', 'Hán tự', 'Pinyin', 'Tiếng Việt', 'English', 'Phát âm', 'Đã học'],
         placeholder: 'Tìm Hán tự, pinyin, nghĩa Việt hoặc English...',
         unit: 'từ',
         label: 'từ vựng',
@@ -362,7 +367,8 @@ els.flipCard.addEventListener('click', flipCurrentCard);
 els.prevCard.addEventListener('click', () => moveCard(-1));
 els.nextCard.addEventListener('click', () => moveCard(1));
 els.studyCard.addEventListener('click', flipCurrentCard);
-els.speakCard.addEventListener('click', speakCurrentCard);
+els.speakMandarin.addEventListener('click', () => speakCurrentCard('mandarin'));
+els.speakCantonese.addEventListener('click', () => speakCurrentCard('cantonese'));
 els.togglePinyin.addEventListener('click', togglePinyinVisibility);
 els.shuffleCards.addEventListener('click', toggleShuffle);
 els.recallPanel.addEventListener('click', (event) => {
@@ -423,6 +429,13 @@ els.appBody.addEventListener('change', (event) => {
     setProgressValue(target.dataset.key, { learned: target.checked });
     syncCardProgressControls();
     updateMeta(els.searchInput.value.toLowerCase().trim());
+});
+
+els.appBody.addEventListener('click', (event) => {
+    const speakButton = event.target.closest('[data-speak-language]');
+    if (!speakButton) return;
+    const item = currentFiltered[Number(speakButton.dataset.itemIndex)];
+    if (item) speakText(item.hanzi, speakButton.dataset.speakLanguage, speakButton);
 });
 
 els.reviewPanel.addEventListener('click', (event) => {
@@ -872,6 +885,7 @@ function renderCard() {
     els.nextCard.disabled = !hasCards || currentFiltered.length < 2;
     els.flipCard.disabled = !hasCards;
     els.studyNotePanel.hidden = !hasCards;
+    els.pronunciationCompare.hidden = !hasCards || currentMode !== 'vocab';
 
     if (!hasCards) {
         els.cardCounter.textContent = '0 / 0';
@@ -879,6 +893,8 @@ function renderCard() {
         els.cardPinyin.textContent = 'Không có thẻ';
         els.cardMeaning.textContent = 'Không tìm thấy nội dung phù hợp.';
         els.cardExample.textContent = 'Hãy thử từ khóa khác hoặc đổi cấp HSK.';
+        els.cardMandarin.textContent = '';
+        els.cardCantonese.textContent = '';
         els.previewHanzi.textContent = 'HSK';
         els.previewPinyin.textContent = 'ready';
         syncCardProgressControls();
@@ -892,6 +908,8 @@ function renderCard() {
         els.cardPinyin.textContent = item.pinyin;
         els.cardMeaning.textContent = getMeaning(item);
         els.cardExample.textContent = getEnglish(item);
+        els.cardMandarin.textContent = item.pinyin;
+        els.cardCantonese.textContent = 'Cùng chữ Hán · nghe qua Google Translate';
         els.previewHanzi.textContent = item.hanzi;
         els.previewPinyin.textContent = item.pinyin;
         syncCardProgressControls();
@@ -912,23 +930,72 @@ function flipCurrentCard() {
     renderCard();
 }
 
-function speakCurrentCard() {
+function speakCurrentCard(language = 'mandarin') {
     const item = currentFiltered[currentCardIndex];
-    if (!item || !('speechSynthesis' in window)) {
-        showToast('Trình duyệt này chưa hỗ trợ đọc thành tiếng.');
+    if (!item) {
+        return;
+    }
+    const text = currentMode === 'vocab' ? item.hanzi : (item.ex_cn || item.structure);
+    speakText(text, language, language === 'cantonese' ? els.speakCantonese : els.speakMandarin);
+}
+
+function speakText(rawText, language, button) {
+    const isCantonese = language === 'cantonese';
+    const text = String(rawText || '').split('｜')[0].trim();
+    if (!text) return;
+
+    if (activeSpeechAudio) {
+        activeSpeechAudio.pause();
+        activeSpeechAudio = null;
+    }
+
+    const googleLanguage = isCantonese ? 'yue' : 'zh-CN';
+    const googleAudioUrl = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=${googleLanguage}&q=${encodeURIComponent(text)}`;
+    const audio = new Audio(googleAudioUrl);
+    let usedFallback = false;
+    const useNativeFallback = () => {
+        if (usedFallback) return;
+        usedFallback = true;
+        speakWithBrowserVoice(text, language, button);
+    };
+
+    activeSpeechAudio = audio;
+    button?.classList.add('is-speaking');
+    audio.addEventListener('ended', () => {
+        if (activeSpeechAudio === audio) activeSpeechAudio = null;
+        button?.classList.remove('is-speaking');
+    });
+    audio.addEventListener('error', useNativeFallback, { once: true });
+    audio.play().catch(useNativeFallback);
+}
+
+function speakWithBrowserVoice(text, language, button) {
+    if (!('speechSynthesis' in window)) {
+        button?.classList.remove('is-speaking');
+        showToast('Không thể tải âm thanh Google Translate và trình duyệt chưa hỗ trợ phát âm thay thế.');
+        return;
+    }
+
+    const isCantonese = language === 'cantonese';
+    const voices = window.speechSynthesis.getVoices();
+    const voice = isCantonese
+        ? voices.find((item) => /^(yue|zh-hk)/i.test(item.lang))
+        : voices.find((item) => /^zh-(cn|sg)/i.test(item.lang)) || voices.find((item) => /^zh/i.test(item.lang));
+    if (isCantonese && !voice) {
+        button?.classList.remove('is-speaking');
+        showToast('Chưa tìm thấy giọng Quảng Đông. Hãy bật giọng Cantonese trong cài đặt hệ thống.');
         return;
     }
 
     window.speechSynthesis.cancel();
-    const text = currentMode === 'vocab' ? item.hanzi : (item.ex_cn || item.structure);
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'zh-CN';
+    utterance.lang = isCantonese ? 'yue-HK' : 'zh-CN';
     utterance.rate = 0.82;
-    const chineseVoice = window.speechSynthesis.getVoices().find((voice) => voice.lang.toLowerCase().startsWith('zh'));
-    if (chineseVoice) utterance.voice = chineseVoice;
+    if (voice) utterance.voice = voice;
+    button?.classList.add('is-speaking');
+    utterance.onend = () => button?.classList.remove('is-speaking');
+    utterance.onerror = () => button?.classList.remove('is-speaking');
     window.speechSynthesis.speak(utterance);
-    els.speakCard.classList.add('is-speaking');
-    utterance.onend = () => els.speakCard.classList.remove('is-speaking');
 }
 
 function togglePinyinVisibility() {
@@ -1006,7 +1073,9 @@ function handleStudyKeyboard(event) {
     } else if (event.key === 'ArrowRight') {
         moveCard(1);
     } else if (event.key.toLowerCase() === 's') {
-        speakCurrentCard();
+        speakCurrentCard('mandarin');
+    } else if (event.key.toLowerCase() === 'c' && currentMode === 'vocab') {
+        speakCurrentCard('cantonese');
     } else if (event.key.toLowerCase() === 'p') {
         togglePinyinVisibility();
     } else if (isCardFlipped && ['1', '2', '3', '4'].includes(event.key)) {
@@ -1055,6 +1124,10 @@ function renderTable(dataToRender) {
                 <td data-label="Pinyin"><span class="cell-pinyin">${escapeHtml(item.pinyin)}</span></td>
                 <td class="cell-vi" data-label="Tiếng Việt">${escapeHtml(getMeaning(item))}</td>
                 <td class="cell-en" data-label="English">${escapeHtml(getEnglish(item))}</td>
+                <td class="cell-pronunciation" data-label="Phát âm">
+                    <button class="table-speak" type="button" data-speak-language="mandarin" data-item-index="${index}" aria-label="Nghe Phổ thông ${escapeHtml(item.hanzi)}">普通话</button>
+                    <button class="table-speak cantonese" type="button" data-speak-language="cantonese" data-item-index="${index}" aria-label="Nghe Quảng Đông ${escapeHtml(item.hanzi)}">廣東話</button>
+                </td>
                 ${progressCells}
             `;
         } else {
