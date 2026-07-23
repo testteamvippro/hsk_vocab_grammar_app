@@ -1433,6 +1433,141 @@ tbody tr:hover {
     font-size: 1.2rem;
 }
 
+.handwriting-notebook {
+    background: linear-gradient(180deg, #fffdf8, #fff);
+    border-color: #eadfca;
+}
+
+.handwriting-controls {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    gap: 8px;
+    align-items: end;
+}
+
+.handwriting-controls label {
+    display: grid;
+    gap: 5px;
+    color: var(--muted);
+    font-size: .72rem;
+    font-weight: 800;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+}
+
+.handwriting-controls input {
+    min-height: 44px;
+    border: 1px solid #d9cfbd;
+    border-radius: 10px;
+    outline: none;
+    color: var(--ink);
+    font-family: 'Noto Sans SC', sans-serif;
+    font-size: 1.1rem;
+    padding: 8px 12px;
+}
+
+.handwriting-controls input:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(22, 119, 255, .12); }
+
+.notebook-sentence-model {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    border-block: 1px dashed #dfd4c0;
+    color: var(--ink);
+    padding: 10px 2px;
+}
+
+.notebook-sentence-model span,
+.sentence-practice-label {
+    color: #9a7650;
+    font-size: .7rem;
+    font-weight: 900;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+}
+
+.notebook-sentence-model strong {
+    font-family: 'Noto Sans SC', sans-serif;
+    font-size: 1.2rem;
+    font-weight: 700;
+}
+
+.character-notebook-list { display: grid; gap: 10px; }
+
+.character-notebook-row {
+    display: grid;
+    grid-template-columns: 108px minmax(0, 1fr);
+    gap: 10px;
+    min-height: 128px;
+}
+
+.notebook-model {
+    display: grid;
+    place-items: center;
+    border: 1px solid #dccdb7;
+    background-color: #fffaf0;
+    background-image: linear-gradient(#eadfcb 1px, transparent 1px), linear-gradient(90deg, #eadfcb 1px, transparent 1px);
+    background-size: 50% 50%;
+    color: #b66443;
+    font-family: 'Noto Sans SC', sans-serif;
+    font-size: 4rem;
+    line-height: 1;
+}
+
+.handwriting-canvas-wrap { position: relative; min-width: 0; }
+
+.handwriting-canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    min-height: 128px;
+    border: 1px solid #d5deea;
+    border-radius: 10px;
+    background-color: #fff;
+    background-image: linear-gradient(#edf2f8 1px, transparent 1px), linear-gradient(90deg, #edf2f8 1px, transparent 1px);
+    background-size: 25% 50%;
+    cursor: crosshair;
+    touch-action: none;
+}
+
+.sentence-notebook-row {
+    display: grid;
+    gap: 7px;
+    margin-top: 4px;
+}
+
+.sentence-canvas { height: 190px; }
+
+.canvas-clear {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    border: 1px solid #d6dfeb;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, .9);
+    color: var(--muted);
+    font-size: .68rem;
+    font-weight: 800;
+    padding: 4px 8px;
+}
+
+.canvas-clear:hover { border-color: var(--rose); color: var(--rose); }
+.notebook-empty { color: var(--muted); }
+
+@media (max-width: 780px) {
+    .handwriting-controls { grid-template-columns: 1fr 1fr; }
+    .handwriting-controls label { grid-column: 1 / -1; }
+}
+
+@media (max-width: 560px) {
+    .handwriting-controls { grid-template-columns: 1fr; }
+    .character-notebook-row { grid-template-columns: 76px minmax(0, 1fr); min-height: 106px; }
+    .notebook-model { font-size: 3rem; }
+    .handwriting-canvas { min-height: 106px; }
+    .sentence-canvas { height: 160px; }
+    .notebook-sentence-model { align-items: flex-start; flex-direction: column; gap: 2px; }
+}
+
 .stroke-grid {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));

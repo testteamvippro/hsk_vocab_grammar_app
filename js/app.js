@@ -151,6 +151,8 @@ let writingDrafts = loadWritingDrafts();
 let activeWritingDraftId = null;
 let pinyinDictionaryCache = null;
 let currentPinyinCandidates = [];
+let handwritingPracticeText = '我喜欢学习中文。';
+let activeHandwritingCanvas = null;
 
 const els = {
     navStudy: document.getElementById('navStudy'),
@@ -410,6 +412,10 @@ els.writingContent.addEventListener('input', handleWritingWorkspaceInput);
 els.writingContent.addEventListener('click', handleWritingWorkspaceClick);
 els.writingContent.addEventListener('change', handleWritingWorkspaceChange);
 els.writingContent.addEventListener('keydown', handleWritingWorkspaceKeydown);
+els.writingContent.addEventListener('pointerdown', startHandwritingStroke);
+els.writingContent.addEventListener('pointermove', continueHandwritingStroke);
+els.writingContent.addEventListener('pointerup', endHandwritingStroke);
+els.writingContent.addEventListener('pointercancel', endHandwritingStroke);
 els.cardLearned.addEventListener('change', () => {
     const item = currentFiltered[currentCardIndex];
     if (!item) return;
@@ -2366,6 +2372,59 @@ function buildWritingWorkspace() {
     `;
 }
 
+function buildHandwritingNotebook() {
+    const characters = Array.from(handwritingPracticeText)
+        .filter((character) => /[\u3400-\u9fff]/.test(character))
+        .slice(0, 12);
+
+    return `
+        <section class="writing-section handwriting-notebook" id="handwritingNotebook">
+            <div class="writing-section-title handwriting-heading">
+                <div>
+                    <span class="review-tag">Vở luyện chữ</span>
+                    <h4>Viết bằng iPad & Apple Pencil</h4>
+                    <p>Nhập một từ hoặc câu. Mỗi dòng có chữ mẫu bên trái và ô trống để bạn tự viết.</p>
+                </div>
+                <span class="local-only-badge">✎ Nét viết không rời thiết bị</span>
+            </div>
+
+            <div class="handwriting-controls">
+                <label for="handwritingText">
+                    <span>Mẫu để luyện</span>
+                    <input id="handwritingText" type="text" maxlength="80" lang="zh-CN" value="${escapeHtml(handwritingPracticeText)}" placeholder="Ví dụ: 我喜欢学习中文。">
+                </label>
+                <button class="primary-action" type="button" data-writing-action="generate-notebook">Tạo trang vở</button>
+                <button class="ghost-light-action" type="button" data-writing-action="clear-all-handwriting">Xóa toàn bộ nét</button>
+            </div>
+
+            <div class="notebook-sentence-model">
+                <span>MẪU CÂU</span>
+                <strong>${escapeHtml(handwritingPracticeText)}</strong>
+            </div>
+
+            <div class="character-notebook-list">
+                ${characters.length ? characters.map((character, index) => `
+                    <article class="character-notebook-row">
+                        <div class="notebook-model" aria-label="Chữ mẫu ${escapeHtml(character)}">${escapeHtml(character)}</div>
+                        <div class="handwriting-canvas-wrap">
+                            <canvas class="handwriting-canvas character-canvas" data-handwriting-canvas="character-${index}" aria-label="Vùng luyện viết chữ ${escapeHtml(character)}"></canvas>
+                            <button type="button" class="canvas-clear" data-writing-action="clear-handwriting" data-canvas-id="character-${index}">Xóa nét</button>
+                        </div>
+                    </article>
+                `).join('') : '<p class="notebook-empty">Hãy nhập chữ Hán để tạo các dòng luyện viết.</p>'}
+            </div>
+
+            <div class="sentence-notebook-row">
+                <div class="sentence-practice-label">Luyện cả câu</div>
+                <div class="handwriting-canvas-wrap">
+                    <canvas class="handwriting-canvas sentence-canvas" data-handwriting-canvas="sentence" aria-label="Vùng luyện viết câu ${escapeHtml(handwritingPracticeText)}"></canvas>
+                    <button type="button" class="canvas-clear" data-writing-action="clear-handwriting" data-canvas-id="sentence">Xóa nét</button>
+                </div>
+            </div>
+        </section>
+    `;
+}
+
 function buildWritingDraftList() {
     if (writingDrafts.length === 0) {
         return `<div class="draft-empty"><strong>Chưa có bản nháp</strong><span>Viết đoạn đầu tiên rồi bấm “Lưu bản nháp”.</span></div>`;
@@ -2416,6 +2475,95 @@ function handleWritingWorkspaceClick(event) {
     if (action === 'new') resetWritingWorkspace();
     if (action === 'open') openWritingDraft(actionTarget.dataset.draftId);
     if (action === 'delete') deleteWritingDraft(actionTarget.dataset.draftId);
+    if (action === 'generate-notebook') {
+        handwritingPracticeText = document.getElementById('handwritingText')?.value.trim() || '你好';
+        renderHandwritingNotebook();
+    }
+    if (action === 'clear-handwriting') clearHandwritingCanvas(actionTarget.dataset.canvasId);
+    if (action === 'clear-all-handwriting') {
+        document.querySelectorAll('.handwriting-canvas').forEach((canvas) => clearHandwritingCanvas(canvas.dataset.handwritingCanvas));
+    }
+}
+
+function renderHandwritingNotebook() {
+    const notebook = document.getElementById('handwritingNotebook');
+    if (!notebook) return;
+    notebook.outerHTML = buildHandwritingNotebook();
+    initializeHandwritingCanvases();
+}
+
+function initializeHandwritingCanvases() {
+    document.querySelectorAll('.handwriting-canvas').forEach((canvas) => {
+        const bounds = canvas.getBoundingClientRect();
+        const pixelRatio = window.devicePixelRatio || 1;
+        canvas.width = Math.max(1, Math.round(bounds.width * pixelRatio));
+        canvas.height = Math.max(1, Math.round(bounds.height * pixelRatio));
+        const context = canvas.getContext('2d');
+        context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+        drawHandwritingGuides(canvas);
+    });
+}
+
+function drawHandwritingGuides(canvas) {
+    const context = canvas.getContext('2d');
+    const width = canvas.clientWidth;
+    const height = canvas.clientHeight;
+    context.clearRect(0, 0, width, height);
+    context.save();
+    context.strokeStyle = '#dce6f3';
+    context.lineWidth = 1;
+    context.setLineDash([4, 4]);
+    context.beginPath();
+    context.moveTo(0, height / 2);
+    context.lineTo(width, height / 2);
+    context.moveTo(width / 2, 0);
+    context.lineTo(width / 2, height);
+    context.stroke();
+    context.restore();
+}
+
+function getHandwritingPoint(event, canvas) {
+    const bounds = canvas.getBoundingClientRect();
+    return {
+        x: event.clientX - bounds.left,
+        y: event.clientY - bounds.top,
+    };
+}
+
+function startHandwritingStroke(event) {
+    const canvas = event.target.closest('.handwriting-canvas');
+    if (!canvas) return;
+    event.preventDefault();
+    activeHandwritingCanvas = canvas;
+    canvas.setPointerCapture(event.pointerId);
+    const point = getHandwritingPoint(event, canvas);
+    const context = canvas.getContext('2d');
+    context.beginPath();
+    context.moveTo(point.x, point.y);
+}
+
+function continueHandwritingStroke(event) {
+    if (!activeHandwritingCanvas || event.target !== activeHandwritingCanvas) return;
+    event.preventDefault();
+    const point = getHandwritingPoint(event, activeHandwritingCanvas);
+    const context = activeHandwritingCanvas.getContext('2d');
+    context.lineTo(point.x, point.y);
+    context.strokeStyle = '#172033';
+    context.lineWidth = event.pointerType === 'pen' ? 4.5 : 5.5;
+    context.lineCap = 'round';
+    context.lineJoin = 'round';
+    context.stroke();
+}
+
+function endHandwritingStroke(event) {
+    if (!activeHandwritingCanvas) return;
+    if (activeHandwritingCanvas.hasPointerCapture(event.pointerId)) activeHandwritingCanvas.releasePointerCapture(event.pointerId);
+    activeHandwritingCanvas = null;
+}
+
+function clearHandwritingCanvas(canvasId) {
+    const canvas = document.querySelector(`[data-handwriting-canvas="${canvasId}"]`);
+    if (canvas) drawHandwritingGuides(canvas);
 }
 
 function renderPinyinCandidates(rawValue) {
@@ -2726,6 +2874,8 @@ function renderWritingPage() {
     renderMotivationStats();
 
     els.writingContent.innerHTML = `
+        ${buildHandwritingNotebook()}
+
         ${buildWritingWorkspace()}
 
         <section class="writing-section writing-practice">
@@ -2845,6 +2995,7 @@ function renderWritingPage() {
             </div>
         </section>
     `;
+    initializeHandwritingCanvases();
 }
 
 function renderAiPanel(keepConversation = true) {
