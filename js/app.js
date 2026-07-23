@@ -2404,12 +2404,18 @@ function buildHandwritingNotebook() {
 
             <div class="character-notebook-list">
                 ${characters.length ? characters.map((character, index) => `
-                    <article class="character-notebook-row">
-                        <div class="notebook-model" aria-label="Chữ mẫu ${escapeHtml(character)}">${escapeHtml(character)}</div>
-                        <div class="handwriting-canvas-wrap">
-                            <canvas class="handwriting-canvas character-canvas" data-handwriting-canvas="character-${index}" aria-label="Vùng luyện viết chữ ${escapeHtml(character)}"></canvas>
-                            <button type="button" class="canvas-clear" data-writing-action="clear-handwriting" data-canvas-id="character-${index}">Xóa nét</button>
+                    <article class="character-notebook-row" data-handwriting-row="${index}">
+                        <div class="notebook-character-meta">
+                            <strong>${escapeHtml(character)}</strong>
+                            <span>${escapeHtml(getNotebookPinyin(character))}</span>
                         </div>
+                        <div class="notebook-square-grid">
+                            <div class="notebook-model" aria-label="Chữ mẫu ${escapeHtml(character)}">${escapeHtml(character)}</div>
+                            ${Array.from({ length: 7 }, (_, cellIndex) => `
+                                <canvas class="handwriting-canvas character-canvas" data-handwriting-canvas="character-${index}-${cellIndex}" aria-label="Ô luyện viết chữ ${escapeHtml(character)} ${cellIndex + 1}"></canvas>
+                            `).join('')}
+                        </div>
+                        <button type="button" class="canvas-clear row-clear" data-writing-action="clear-handwriting-row" data-row-id="${index}">Xóa dòng</button>
                     </article>
                 `).join('') : '<p class="notebook-empty">Hãy nhập chữ Hán để tạo các dòng luyện viết.</p>'}
             </div>
@@ -2480,9 +2486,20 @@ function handleWritingWorkspaceClick(event) {
         renderHandwritingNotebook();
     }
     if (action === 'clear-handwriting') clearHandwritingCanvas(actionTarget.dataset.canvasId);
+    if (action === 'clear-handwriting-row') {
+        document.querySelectorAll(`[data-handwriting-row="${actionTarget.dataset.rowId}"] .handwriting-canvas`).forEach((canvas) => {
+            clearHandwritingCanvas(canvas.dataset.handwritingCanvas);
+        });
+    }
     if (action === 'clear-all-handwriting') {
         document.querySelectorAll('.handwriting-canvas').forEach((canvas) => clearHandwritingCanvas(canvas.dataset.handwritingCanvas));
     }
+}
+
+function getNotebookPinyin(character) {
+    const converter = window.pinyinPro;
+    if (!converter?.pinyin) return 'Chữ mẫu';
+    return converter.pinyin(character, { toneType: 'symbol', type: 'string' });
 }
 
 function renderHandwritingNotebook() {
@@ -2862,16 +2879,18 @@ function formatDraftDate(value) {
 }
 
 function renderWritingPage() {
-    const radicalCount = radicalGroups.reduce((sum, group) => sum + group.items.length, 0);
-
     els.surfaceTitle.textContent = 'Viết tiếng Trung';
-    els.wordCount.textContent = `${writingDrafts.length} bản nháp`;
-    els.activeLevelLabel.textContent = 'Writing';
-    els.courseTitle.textContent = 'Soạn đoạn văn tiếng Trung';
-    els.levelHint.textContent = 'Gõ pinyin để đổi sang chữ Hán, hoặc nhập tiếng Trung trực tiếp rồi lưu bản nháp trên thiết bị.';
-    els.resultMeta.textContent = 'Bài viết chỉ được lưu trong trình duyệt này và không được tải lên máy chủ.';
+    els.wordCount.textContent = 'Vở luyện viết';
+    els.activeLevelLabel.textContent = 'Luyện viết';
+    els.courseTitle.textContent = 'Vở luyện chữ Hán';
+    els.levelHint.textContent = 'Tạo dòng mẫu cho từng chữ, rồi viết trực tiếp bằng Apple Pencil hoặc ngón tay.';
+    els.resultMeta.textContent = 'Trang này chỉ dành cho luyện viết chữ. Nét viết được giữ trên thiết bị của bạn.';
     els.progressFill.style.width = '100%';
     renderMotivationStats();
+
+    els.writingContent.innerHTML = buildHandwritingNotebook();
+    initializeHandwritingCanvases();
+    return;
 
     els.writingContent.innerHTML = `
         ${buildHandwritingNotebook()}
