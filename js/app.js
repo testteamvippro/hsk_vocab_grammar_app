@@ -151,7 +151,7 @@ let writingDrafts = loadWritingDrafts();
 let activeWritingDraftId = null;
 let pinyinDictionaryCache = null;
 let currentPinyinCandidates = [];
-let handwritingPracticeText = '我喜欢学习中文。';
+let handwritingPracticeText = '啊矮爱人安静排八把爸';
 let activeHandwritingCanvas = null;
 
 const els = {
@@ -2378,55 +2378,47 @@ function buildHandwritingNotebook() {
         .slice(0, 12);
 
     return `
-        <section class="writing-section handwriting-notebook" id="handwritingNotebook">
-            <div class="writing-section-title handwriting-heading">
-                <div>
-                    <span class="review-tag">Vở luyện chữ</span>
-                    <h4>Viết bằng iPad & Apple Pencil</h4>
-                    <p>Nhập một từ hoặc câu. Mỗi dòng có chữ mẫu bên trái và ô trống để bạn tự viết.</p>
-                </div>
-                <span class="local-only-badge">✎ Nét viết không rời thiết bị</span>
-            </div>
-
+        <section class="handwriting-notebook" id="handwritingNotebook">
             <div class="handwriting-controls">
                 <label for="handwritingText">
-                    <span>Mẫu để luyện</span>
-                    <input id="handwritingText" type="text" maxlength="80" lang="zh-CN" value="${escapeHtml(handwritingPracticeText)}" placeholder="Ví dụ: 我喜欢学习中文。">
+                    <span>Từ hoặc câu để luyện</span>
+                    <input id="handwritingText" type="text" maxlength="80" lang="zh-CN" value="${escapeHtml(handwritingPracticeText)}" placeholder="Ví dụ: 你好我喜欢学习中文">
                 </label>
-                <button class="primary-action" type="button" data-writing-action="generate-notebook">Tạo trang vở</button>
-                <button class="ghost-light-action" type="button" data-writing-action="clear-all-handwriting">Xóa toàn bộ nét</button>
+                <button class="primary-action" type="button" data-writing-action="generate-notebook">Tạo phiếu luyện viết</button>
+                <button class="ghost-light-action" type="button" data-writing-action="clear-all-handwriting">Xóa nét đã viết</button>
             </div>
 
-            <div class="notebook-sentence-model">
-                <span>MẪU CÂU</span>
-                <strong>${escapeHtml(handwritingPracticeText)}</strong>
-            </div>
-
-            <div class="character-notebook-list">
+            <article class="worksheet-paper">
+                <header class="worksheet-header">
+                    <span>Họ tên: ____________________</span>
+                    <strong>PHIẾU LUYỆN VIẾT CHỮ HÁN</strong>
+                    <span>Ngày: __________</span>
+                </header>
+                <p class="worksheet-subtitle">Chữ mẫu → đồ theo 4 ô mờ → tự viết vào các ô trống</p>
+                <div class="character-notebook-list">
                 ${characters.length ? characters.map((character, index) => `
                     <article class="character-notebook-row" data-handwriting-row="${index}">
                         <div class="notebook-character-meta">
-                            <strong>${escapeHtml(character)}</strong>
                             <span>${escapeHtml(getNotebookPinyin(character))}</span>
                         </div>
                         <div class="notebook-square-grid">
                             <div class="notebook-model" aria-label="Chữ mẫu ${escapeHtml(character)}">${escapeHtml(character)}</div>
-                            ${Array.from({ length: 7 }, (_, cellIndex) => `
+                            ${Array.from({ length: 3 }, () => `<div class="trace-model">${escapeHtml(character)}</div>`).join('')}
+                            ${Array.from({ length: 6 }, (_, cellIndex) => `
                                 <canvas class="handwriting-canvas character-canvas" data-handwriting-canvas="character-${index}-${cellIndex}" aria-label="Ô luyện viết chữ ${escapeHtml(character)} ${cellIndex + 1}"></canvas>
                             `).join('')}
                         </div>
-                        <button type="button" class="canvas-clear row-clear" data-writing-action="clear-handwriting-row" data-row-id="${index}">Xóa dòng</button>
                     </article>
                 `).join('') : '<p class="notebook-empty">Hãy nhập chữ Hán để tạo các dòng luyện viết.</p>'}
-            </div>
-
-            <div class="sentence-notebook-row">
-                <div class="sentence-practice-label">Luyện cả câu</div>
-                <div class="handwriting-canvas-wrap">
-                    <canvas class="handwriting-canvas sentence-canvas" data-handwriting-canvas="sentence" aria-label="Vùng luyện viết câu ${escapeHtml(handwritingPracticeText)}"></canvas>
-                    <button type="button" class="canvas-clear" data-writing-action="clear-handwriting" data-canvas-id="sentence">Xóa nét</button>
                 </div>
-            </div>
+                <div class="worksheet-sentence">
+                    <span>Luyện cả câu:</span>
+                    <strong>${escapeHtml(handwritingPracticeText)}</strong>
+                    <canvas class="handwriting-canvas sentence-canvas" data-handwriting-canvas="sentence" aria-label="Vùng luyện viết câu ${escapeHtml(handwritingPracticeText)}"></canvas>
+                </div>
+                <footer class="worksheet-footer">Luyện chậm, đúng thứ tự nét · Mỗi ngày một trang</footer>
+            </article>
+
         </section>
     `;
 }
@@ -2535,6 +2527,12 @@ function drawHandwritingGuides(canvas) {
     context.lineTo(width, height / 2);
     context.moveTo(width / 2, 0);
     context.lineTo(width / 2, height);
+    if (canvas.classList.contains('character-canvas')) {
+        context.moveTo(0, 0);
+        context.lineTo(width, height);
+        context.moveTo(width, 0);
+        context.lineTo(0, height);
+    }
     context.stroke();
     context.restore();
 }
