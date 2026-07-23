@@ -164,6 +164,7 @@ const els = {
     navTests: document.getElementById('navTests'),
     navVideo: document.getElementById('navVideo'),
     navWriting: document.getElementById('navWriting'),
+    navNotes: document.getElementById('navNotes'),
     navAi: document.getElementById('navAi'),
     coursePanel: document.getElementById('coursePanel'),
     btnVocab: document.getElementById('btnVocab'),
@@ -337,6 +338,10 @@ const routeConfig = {
         nav: 'navWriting',
         panel: 'writingPanel',
     },
+    notes: {
+        nav: 'navNotes',
+        panel: 'writingPanel',
+    },
     ai: {
         nav: 'navAi',
         panel: 'aiPanel',
@@ -357,6 +362,7 @@ els.navExam.addEventListener('click', () => showExamRoute());
 els.navTests.addEventListener('click', () => showTestRoute());
 els.navVideo.addEventListener('click', () => showVideoRoute());
 els.navWriting.addEventListener('click', () => showWritingRoute());
+els.navNotes.addEventListener('click', () => showNotesRoute());
 els.navAi.addEventListener('click', () => showAiRoute());
 els.btnVocab.addEventListener('click', () => switchMode('vocab'));
 els.btnGrammar.addEventListener('click', () => switchMode('grammar'));
@@ -689,7 +695,14 @@ function showVideoRoute() {
 }
 
 function showWritingRoute() {
+    writingSubpage = 'worksheet';
     activateRoute('writing');
+    renderWritingPage();
+}
+
+function showNotesRoute() {
+    writingSubpage = 'notes';
+    activateRoute('notes');
     renderWritingPage();
 }
 
@@ -2519,6 +2532,7 @@ function handleWritingWorkspaceClick(event) {
 
     if (action === 'switch-subpage') {
         writingSubpage = actionTarget.dataset.writingSubpage;
+        setActiveNav(writingSubpage === 'notes' ? 'navNotes' : 'navWriting');
         renderWritingPage();
         return;
     }
